@@ -1,0 +1,111 @@
+#!/bin/bash
+# pulse-v1.0
+
+trap 'printf "\e[?25h\e[0m\e[2J\e[H"; exit 0' INT TERM
+printf "\e[?25l\e[2J"
+
+# --- Static Data ---
+OS=$(grep -m1 '^PRETTY_NAME=' /etc/os-release | cut -d= -f2 | tr -d '"')
+KERNEL=$(uname -r)
+UPTIME=$(uptime -p | sed 's/up //')
+RES=$(xdpyinfo 2>/dev/null | grep dimensions | awk '{print $2 " @ 60Hz"}' || echo "1366x768 @ 60Hz")
+DE="${XDG_CURRENT_DESKTOP:-GNOME}"
+WM="Mutter (X11)"
+TERM_N="${TERM_PROGRAM:-konsole}"
+SHELL_V="$SHELL $(echo $BASH_VERSION | cut -d'(' -f1)"
+PKGS="$(dpkg-query -f '.\n' -W 2>/dev/null | wc -l) (dpkg), $(flatpak list 2>/dev/null | wc -l) (flatpak)"
+OS_AGE="$(( ($(date +%s) - $(stat -c %W /)) / 86400 )) days"
+
+# --- Hardware Info Logic ---
+PREV_T=0; PREV_I=0; PREV_RX=0; PREV_TX=0; TICK=0
+CPU_HISTORY=(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)
+CPU_M=$(awk -F: '/model name/ {print $2; exit}' /proc/cpuinfo | sed -e 's/^[ \t]*//' -e 's/ with.*//' | cut -c1-35)
+
+# Improved GPU Detection (Searches for Vega/Radeon specifically)
+GPU_M=$(glxinfo -B 2>/dev/null | grep -m1 "Device" | cut -d: -f2 | sed 's/^[ \t]*//;s/(.*//')
+if [ -z "$GPU_M" ]; then
+    GPU_M=$(lspci | grep -iE 'vga|3d|display' | cut -d: -f3 | sed 's/^[ \t]*//;s/\[.*\]//;s/(rev.*//' | head -n1)
+fi
+GPU_M=$(echo "$GPU_M" | cut -c1-35)
+
+COLORS=(31 33 36 32 35 34 36 31 33)
+
+draw_bar() {
+    local pct=$1
+    local len=35
+    local fill=$(( pct * len / 100 ))
+    printf "\e[44m"
+    for ((i=0; i<fill; i++)); do printf "\e[97m█"; done
+    for ((i=fill; i<len; i++)); do printf "\e[90m▒"; done
+    printf "\e[0m"
+}
+
+draw_graph() {
+    local chars=(" " "▁" "▂" "▃" "▄" "▅" "▆" "▇" "█")
+    for val in "${CPU_HISTORY[@]}"; do
+        local b=$(( val * 3 ))
+        (( b > 100 )) && b=100
+        printf "\e[38;5;39m%s" "${chars[$(( b * 8 / 100 ))]}"
+    done
+    printf "\e[0m"
+}
+
+while true; do
+    # CPU & Frequency
+    read -r _ u n s i w x y z _ < /proc/stat
+    T=$((u+n+s+i+w+x+y+z)); I=$((i+w))
+    CPU=$((100 * (T - PREV_T - (I - PREV_I)) / (T - PREV_T ? T - PREV_T : 1)))
+    PREV_T=$T; PREV_I=$I
+    CPU_FREQ=$(awk -F: '/cpu MHz/ {print $2; exit}' /proc/cpuinfo | xargs | cut -d. -f1)
+
+    # History Smoothing
+    L=${CPU_HISTORY[-1]}; D=$(( CPU - L )); O=$CPU
+    if (( D > 5 )); then O=$(( CPU + D * 2 )); elif (( D < -5 )); then O=$(( CPU + D )); fi
+    (( O < 0 )) && O=0; (( O > 100 )) && O=100
+    S=$(( (L * 60 + O * 40) / 100 ))
+    CPU_HISTORY=("${CPU_HISTORY[@]:1}" "$S")
+
+    # RAM, Disk, Net
+    RAM_DATA=($(free -m | awk '/Mem:/ {print $3, $2}'))
+    used=${RAM_DATA[0]}; total=${RAM_DATA[1]}; RAM_P=$((used * 100 / total))
+    RAM_STR="$(printf "%.2f/%.2f GiB" "$(echo "scale=2;$used/1024"|bc)" "$(echo "scale=2;$total/1024"|bc)")"
+    DISK_DATA=($(df -h / | awk 'NR==2 {print $3, $2, $5}' | tr -d '%'))
+    DISK_USED=${DISK_DATA[0]}; DISK_TOTAL=${DISK_DATA[1]}; DISK_P=${DISK_DATA[2]}
+    read RX TX < <(awk 'NR>2 {rx+=$2; tx+=$10} END {print rx, tx}' /proc/net/dev)
+    DL=$(( (RX - PREV_RX) / 1024 )); UL=$(( (TX - PREV_TX) / 1024 ))
+    PREV_RX=$RX; PREV_TX=$TX
+
+    # UI Render
+    COLOR_INDEX=$(( TICK % ${#COLORS[@]} ))
+    C="\e[1;${COLORS[$COLOR_INDEX]}m"
+
+    printf "\e[1;1H\e[J\n"
+    printf "      ${C} .MMM.   .MMM.  \e[0m    \e[1;31m> user    \e[90m│ \e[0m%s\n" "$USER"
+    printf "      ${C}.MMMMMM.MMMMMM. \e[0m    \e[1;33m> uptime  \e[90m│ \e[0m%s\n" "$UPTIME"
+    printf "      ${C}MMMMMMMMMMMMMMM \e[0m    \e[1;36m> display \e[90m│ \e[0m%s\n" "$RES"
+    printf "      ${C}MMMMMMMMMMMMMMM \e[0m    \e[1;32m> distro  \e[90m│ \e[0m%s\n" "$OS"
+    printf "      ${C}'MMMMMMMMMMMMM' \e[0m    \e[1;35m> kernel  \e[90m│ \e[0m%s\n" "$KERNEL"
+    printf "      ${C}  'MMMMMMMMM'   \e[0m    \e[1;34m> wm      \e[90m│ \e[0m%s\n" "$WM"
+    printf "      ${C}    'MMMMM'     \e[0m    \e[1;36m> desktop \e[90m│ \e[0m%s\n" "$DE"
+    printf "      ${C}      'M'       \e[0m    \e[1;31m> term    \e[90m│ \e[0m%s\n" "$TERM_N"
+    printf "      ${C}     PULSE      \e[0m    \e[1;33m> shell   \e[90m│ \e[0m%s\n" "$SHELL_V"
+    printf "      \e[1;37m   [$(date +'%H:%M:%S')]\e[0m       \e[1;31m> apps    \e[90m│ \e[0m%s\n" "$PKGS"
+    printf "      \e[90m----------------\e[0m    \e[1;32m> disk    \e[90m│ \e[0m%s%%\n" "$DISK_P"
+    printf "                        \e[1;33m  > OS Age  \e[90m│ \e[0m%s\n" "$OS_AGE"
+
+    # Bars Section
+    printf "\n    \e[1;33mCPU \e[0m %3d%% %s  \e[90m%s MHz\e[0m\n" "$CPU" "$(draw_bar $CPU)" "$CPU_FREQ"
+    printf "    \e[1;35mRAM \e[0m %3d%% %s  \e[90m%s\e[0m\n" "$RAM_P" "$(draw_bar $RAM_P)" "$RAM_STR"
+    printf "    \e[1;34mDSK \e[0m %3d%% %s  \e[90m%s/%s\e[0m\n" "$DISK_P" "$(draw_bar $DISK_P)" "$DISK_USED" "$DISK_TOTAL"
+
+    # Details Section
+    printf "\n    \e[1;36mHistory: \e[0m%s\n" "$(draw_graph)"
+    printf "    \e[1;32mNet:     \e[0mD:%skb U:%skb\n" "$DL" "$UL"
+    printf "    \e[1;37mCPU:     \e[0m%s\n" "$CPU_M"
+    printf "    \e[1;37mGPU:     \e[0m%s\n" "$GPU_M"
+
+    printf "\n  \e[90mCreated by Carlos Corral | Pulse Active | \e[34mhttps://ko-fi.com/retrolcdclock\e[0m\n"
+
+    ((TICK++))
+    read -t 1 -n 1 key && break
+done
