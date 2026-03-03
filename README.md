@@ -1,6 +1,3 @@
-Perfect, Carlos. Here is the professional README.md in English. I have formatted the Ko-fi link and your profile link to be directly clickable in GitLab, along with a clean structure for the installation process.
-Markdown
-
 # ⚡ Pulse - System Monitor v1.0
 
 Pulse is a professional, minimalist, high-performance system monitor for the terminal. Designed with a refined "Expert Mode" aesthetic, it provides a clear visualization of critical hardware metrics with minimal impact on system resources.
