@@ -52,6 +52,10 @@ Tras guardar los cambios, reinicia tu terminal o aplica la configuración con so
 
 Pulse es un proyecto creado para hacer la vida de los usuarios más fácil. Si te resulta útil, puedes apoyar su desarrollo invitándome a un café:
 
+☕ Support Pulse
+
+Created with ❤️ by Carlos Corral
+
 Link de donación: https://ko-fi.com/retrolcdclock
 
-Created by Carlos Corral | Pulse Active | 2026
+| Pulse Active | 2026
