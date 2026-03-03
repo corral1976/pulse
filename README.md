@@ -1,4 +1,4 @@
-# ⚡ Pulse - System Monitor v1.0
+# ⚡ Pulse - System Monitor v1.1
 
 Pulse is a professional, minimalist, high-performance system monitor for the terminal. Designed with a refined "Expert Mode" aesthetic, it provides a clear visualization of critical hardware metrics with minimal impact on system resources.
 
