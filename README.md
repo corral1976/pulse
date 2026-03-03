@@ -3,54 +3,55 @@
 Pulse is a professional, minimalist, high-performance system monitor for the terminal. Designed with a refined "Expert Mode" aesthetic, it provides a clear visualization of critical hardware metrics with minimal impact on system resources.
 
 ## ✨ Key Features
-* **Real-Time Telemetry**: Dynamic monitoring of CPU load, current frequency (MHz), RAM usage, storage status, and network traffic.
-* **Advanced Hardware Detection**: Enhanced logic for accurate identification of various GPU architectures (integrated and dedicated) and modern processors.
-* **Dynamic Graphics**: Visual CPU load history integrated directly into the interface using block characters.
-* **Optimized Design**: Interface tailored for modern terminals, recommended for **Dark Blue** backgrounds.
+* **Real-Time Telemetry**: Dynamic monitoring of CPU load, frequency (MHz), RAM, storage, and network.
+* **Advanced Hardware Detection**: Accurate identification of GPU architectures and modern processors.
+* **Dynamic Graphics**: Visual CPU load history using block characters.
+* **Optimized Design**: Tailored for modern terminals, recommended for **Dark Blue** backgrounds.
 
 ## 🚀 Installation & Configuration
 
-For a professional integration on GNU/Linux systems, it is recommended to install Pulse in the user's local binary directory to make it accessible globally.
+For professional integration, install Pulse in your local binary directory.
 
 ### 1. System Requirements
-Ensure you have the necessary dependencies installed for hardware detection and precision calculations:
-
+Install necessary dependencies:
 ```bash
 sudo apt update && sudo apt install pciutils bc x11-utils -y
 
 2. System Deployment
 
-Follow these steps to install the binary into your local folder correctly:
+Follow these steps to install the binary correctly:
 Bash
 
-# Create the local bin directory if it doesn't exist
+# Create local bin folder
 mkdir -p ~/.local/bin
 
-# Copy the script to the binary folder
+# Copy the script
 cp pulse ~/.local/bin/
 
-# Grant execution permissions to the binary
+# Grant permissions
 chmod +x ~/.local/bin/pulse
 
 3. PATH Configuration
 
-To run pulse by simply typing its name from any location, add the following line to the end of your ~/.bashrc file:
+Add this line to the end of your ~/.bashrc to run it from anywhere:
 Bash
 
 export PATH="$HOME/.local/bin:$PATH"
 
-After saving, restart your terminal or apply the changes with source ~/.bashrc.
+Apply changes with: source ~/.bashrc
 🛠️ Technical Specifications
 
-    Data Source: Efficient metric extraction directly from /proc/stat and /proc/net/dev.
+    Data Source: Efficient extraction from /proc/stat and /proc/net/dev.
 
-    Rendering Engine: Developed entirely in Bash using ANSI escape sequences for maximum compatibility and speed.
+    Engine: Pure Bash and ANSI escape sequences.
 
-    Architecture: Clean code without redundant comments, optimized for advanced users.
+    Architecture: Clean code optimized for advanced users.
 
 ☕ Support the Project
 
-Pulse was created to make users' lives easier. If you find it useful, please consider supporting its development:
+If you find Pulse useful, please consider supporting its development:
+
+👉 Buy Me A Coffee
 
 Direct Link: https://ko-fi.com/retrolcdclock
 
