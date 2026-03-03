@@ -2,6 +2,10 @@
 
 Pulse is a professional, minimalist, high-performance system monitor for the terminal. Designed with a refined "Expert Mode" aesthetic, it provides a clear visualization of critical hardware metrics with minimal impact on system resources.
 
+## 📸 Vista previa
+
+![Preview](preview.png)
+
 ## ✨ Key Features
 * **Real-Time Telemetry**: Dynamic monitoring of CPU load, frequency (MHz), RAM, storage, and network.
 * **Advanced Hardware Detection**: Accurate identification of GPU architectures and modern processors.
