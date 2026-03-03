@@ -1,57 +1,57 @@
 # ⚡ Pulse - System Monitor v1.0
 
-Pulse es un monitor de sistema minimalista y de alto rendimiento para la terminal. Diseñado bajo una estética refinada, ofrece una visualización clara de las métricas críticas del hardware con un consumo de recursos despreciable.
+Pulse es un monitor de sistema profesional, minimalista y de alto rendimiento para la terminal. Ha sido diseñado bajo una estética refinada (Expert Mode) para ofrecer una visualización clara de las métricas críticas del hardware con un impacto mínimo en los recursos del sistema.
 
 ## ✨ Características Principales
-- [cite_start]**Telemetría en Tiempo Real**: Monitoreo de carga de CPU, frecuencia actual (MHz), uso de RAM, estado del disco y tráfico de red[cite: 1, 5, 11, 13, 18].
-- [cite_start]**Detección Avanzada de GPU**: Lógica mejorada para identificar correctamente gráficas **AMD Radeon Vega** (especialmente en APUs como el Ryzen 7 5700G) y procesadores modernos[cite: 3].
-- [cite_start]**Gráficos Dinámicos**: Historial visual de carga de CPU integrado directamente en la interfaz mediante caracteres de bloque[cite: 4, 10].
-- **Diseño Optimizado**: Colores dinámicos adaptados para terminales con fondo **Dark Blue** (Azul Oscuro).
+- **Telemetría en Tiempo Real**: Monitoreo dinámico de carga de CPU, frecuencia actual (MHz), uso de memoria RAM, estado de almacenamiento y tráfico de red.
+- **Detección Avanzada de Hardware**: Lógica mejorada para la identificación precisa de diversas arquitecturas de GPU (gráficos integrados y dedicados) y procesadores modernos.
+- **Gráficos Dinámicos**: Historial visual de la carga de CPU integrado directamente en la interfaz mediante caracteres de bloque.
+- **Diseño Optimizado**: Interfaz adaptada para terminales modernas, recomendada para fondos **Dark Blue** (Azul Oscuro).
 
 ## 🚀 Instalación y Configuración
 
-Para una integración profesional en GNU/Linux, instalaremos Pulse en el directorio de binarios del usuario para que sea accesible desde cualquier lugar.
+Para una integración profesional en sistemas GNU/Linux, se recomienda instalar Pulse en el directorio de binarios del usuario para que sea accesible de forma global.
 
 ### 1. Requisitos del Sistema
-Instala las dependencias necesarias para la detección de hardware y cálculos:
+Asegúrate de tener instaladas las dependencias necesarias para la detección de hardware y cálculos de precisión:
 ```bash
 sudo apt update && sudo apt install pciutils bc x11-utils -y
 
 2. Despliegue en el Sistema
 
-Sigue estos pasos para instalar el binario en tu carpeta local:
+Sigue estos pasos para instalar el binario en tu carpeta local de forma correcta:
 Bash
 
 # Crear la carpeta de binarios local si no existe
 mkdir -p ~/.local/bin
 
-# Mover el archivo pulse a la carpeta de binarios
-# (Asegúrate de estar en la carpeta donde descargaste el archivo)
+# Copiar el script a la carpeta de binarios
+# (Asegúrate de ejecutar este comando desde donde descargaste el archivo)
 cp pulse ~/.local/bin/
 
-# Otorgar permisos de ejecución
+# Otorgar permisos de ejecución al binario
 chmod +x ~/.local/bin/pulse
 
 3. Configuración del PATH
 
-Para ejecutar pulse simplemente escribiendo su nombre en la terminal, añade esta línea al final de tu archivo ~/.bashrc:
+Para ejecutar pulse simplemente escribiendo su nombre desde cualquier ubicación, añade la siguiente línea al final de tu archivo ~/.bashrc:
 Bash
 
 export PATH="$HOME/.local/bin:$PATH"
 
-Después de guardarlo, reinicia tu terminal o ejecuta source ~/.bashrc para aplicar los cambios.
+Tras guardar los cambios, reinicia tu terminal o aplica la configuración con source ~/.bashrc.
 🛠️ Especificaciones Técnicas
 
-    Fuente de datos: Extracción directa de /proc/stat y /proc/net/dev para mínima carga.
+    Fuente de Datos: Extracción eficiente de métricas directamente desde /proc/stat y /proc/net/dev.
 
-Renderizado: Basado puramente en Bash y secuencias de escape ANSI.
+    Motor de Renderizado: Desarrollado íntegramente en Bash utilizando secuencias de escape ANSI para máxima compatibilidad y velocidad.
 
-Autor: Creado por Carlos Corral.
+    Arquitectura: Código limpio sin comentarios redundantes, optimizado para entornos de usuario avanzado.
 
 ❤️ Apoya el Proyecto
 
-Si Pulse te resulta útil y quieres apoyar su desarrollo, puedes invitarme a un café:
+Pulse es un proyecto creado para hacer la vida de los usuarios más fácil. Si te resulta útil, puedes apoyar su desarrollo invitándome a un café:
 
-Link directo: https://ko-fi.com/retrolcdclock
+Link de donación: https://ko-fi.com/retrolcdclock
 
-Pulse Active | 2026
+Created by Carlos Corral | Pulse Active | 2026
