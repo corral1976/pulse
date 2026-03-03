@@ -12,9 +12,9 @@ Pulse is a professional, minimalist, high-performance system monitor for the ter
 
 For professional integration, install Pulse in your local binary directory.
 
-### 1. System Requirements
+1. System Requirements
 Install necessary dependencies:
-```bash
+
 sudo apt update && sudo apt install pciutils bc x11-utils -y
 
 2. System Deployment
