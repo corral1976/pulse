@@ -3,10 +3,10 @@
 Pulse is a professional, minimalist, high-performance system monitor for the terminal. Designed with a refined "Expert Mode" aesthetic, it provides a clear visualization of critical hardware metrics with minimal impact on system resources.
 
 ## ✨ Key Features
-- **Real-Time Telemetry**: Dynamic monitoring of CPU load, current frequency (MHz), RAM usage, storage status, and network traffic.
-- **Advanced Hardware Detection**: Enhanced logic for accurate identification of various GPU architectures (integrated and dedicated) and modern processors.
-- **Dynamic Graphics**: Visual CPU load history integrated directly into the interface using block characters.
-- **Optimized Design**: Interface tailored for modern terminals, recommended for **Dark Blue** backgrounds.
+* **Real-Time Telemetry**: Dynamic monitoring of CPU load, current frequency (MHz), RAM usage, storage status, and network traffic.
+* **Advanced Hardware Detection**: Enhanced logic for accurate identification of various GPU architectures (integrated and dedicated) and modern processors.
+* **Dynamic Graphics**: Visual CPU load history integrated directly into the interface using block characters.
+* **Optimized Design**: Interface tailored for modern terminals, recommended for **Dark Blue** backgrounds.
 
 ## 🚀 Installation & Configuration
 
@@ -14,6 +14,7 @@ For a professional integration on GNU/Linux systems, it is recommended to instal
 
 ### 1. System Requirements
 Ensure you have the necessary dependencies installed for hardware detection and precision calculations:
+
 ```bash
 sudo apt update && sudo apt install pciutils bc x11-utils -y
 
@@ -26,7 +27,6 @@ Bash
 mkdir -p ~/.local/bin
 
 # Copy the script to the binary folder
-# (Run this command from the directory where you downloaded the file)
 cp pulse ~/.local/bin/
 
 # Grant execution permissions to the binary
@@ -52,8 +52,6 @@ After saving, restart your terminal or apply the changes with source ~/.bashrc.
 
 Pulse was created to make users' lives easier. If you find it useful, please consider supporting its development:
 
-👉 Buy Me A Coffee
+Direct Link: https://ko-fi.com/retrolcdclock
 
-Created with ❤️ by Carlos Corral
-
-Pulse Active | 2026
+Created with ❤️ by Carlos Corral | Pulse Active | 2026
