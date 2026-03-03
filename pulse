@@ -1,0 +1,226 @@
+#!/bin/bash
+# pulse-v1.1 - Improved Version
+
+trap 'printf "\e[?25h\e[0m\e[2J\e[H"; exit 0' INT TERM
+printf "\e[?25l\e[2J"
+
+DISK_PATH="${DISK_PATH:-/}"
+
+check_dependencies() {
+    local deps=("df" "awk" "free" "uname" "uptime" "lspci" "glxinfo" "xdpyinfo" "bc" "xargs")
+    for dep in "${deps[@]}"; do
+        if ! command -v "$dep" >/dev/null 2>&1; then
+            echo "Warning: Optional dependency '$dep' not found" >&2
+        fi
+    done
+}
+
+OS=$(grep -m1 '^PRETTY_NAME=' /etc/os-release 2>/dev/null | cut -d= -f2 | tr -d '"' || echo "Unknown")
+KERNEL=$(uname -r)
+UPTIME=$(uptime -p 2>/dev/null | sed 's/up //' || echo "Unknown")
+RES=$(xdpyinfo 2>/dev/null | grep dimensions | awk '{print $2 " @ 60Hz"}' || echo "1366x768 @ 60Hz")
+DE="${XDG_CURRENT_DESKTOP:-GNOME}"
+WM="${WM:-Mutter (X11)}"
+TERM_N="${TERM_PROGRAM:-konsole}"
+SHELL_V="$SHELL $(echo $BASH_VERSION | cut -d'(' -f1)"
+PKGS="$(dpkg-query -f '.\n' -W 2>/dev/null | wc -l) (dpkg), $(flatpak list 2>/dev/null | wc -l) (flatpak)"
+OS_AGE="$(( ($(date +%s) - $(stat -c %W / 2>/dev/null || echo $(date +%s))) / 86400 )) days"
+
+# --- Temperature & Battery Functions ---
+get_cpu_temp() {
+    local temp=0
+    if command -v sensors >/dev/null 2>&1; then
+        # Para AMD Ryzen, buscar Tctl o k10temp
+        temp=$(sensors 2>/dev/null | grep -E 'Tctl|Core 0|Package id|CPUTIN' | head -1 | grep -o '[+-][0-9]\+\.[0-9]\+' | head -1)
+        if [ -z "$temp" ]; then
+            temp=$(sensors 2>/dev/null | grep 'k10temp' -A 3 | grep -o '[+-][0-9]\+\.[0-9]\+' | head -1)
+        fi
+    elif [ -f /sys/class/thermal/thermal_zone0/temp ]; then
+        temp=$(awk '{print $1/1000}' /sys/class/thermal/thermal_zone0/temp 2>/dev/null)
+    fi
+    echo "${temp:-0}"
+}
+
+get_gpu_temp() {
+    local temp=0
+    if command -v sensors >/dev/null 2>&1; then
+        # Para AMD GPU integrada
+        temp=$(sensors 2>/dev/null | grep -A 5 'amdgpu' | grep 'edge' | grep -o '[+-][0-9]\+\.[0-9]\+' | head -1)
+        # Para NVIDIA
+        if [ -z "$temp" ] && command -v nvidia-smi >/dev/null 2>&1; then
+            temp=$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits 2>/dev/null)
+        fi
+        # Para NVMe SSD (que puede ser GPU en algunos casos)
+        if [ -z "$temp" ]; then
+            temp=$(sensors 2>/dev/null | grep -A 3 'nvme' | grep 'Composite' | grep -o '[+-][0-9]\+\.[0-9]\+' | head -1)
+        fi
+    fi
+    echo "${temp:-0}"
+}
+
+get_battery_info() {
+    local battery_info=""
+    if command -v upower >/dev/null 2>&1; then
+        local battery=$(upower -e 2>/dev/null | grep battery | head -1)
+        if [ -n "$battery" ]; then
+            local percentage=$(upower -i "$battery" 2>/dev/null | grep percentage | grep -o '[0-9]\+%' | head -1)
+            local state=$(upower -i "$battery" 2>/dev/null | grep state | awk '{print $2}' | head -1)
+            if [ -n "$percentage" ]; then
+                battery_info="${percentage} (${state})"
+            fi
+        fi
+    elif [ -f /sys/class/power_supply/BAT0/capacity ]; then
+        local percentage=$(cat /sys/class/power_supply/BAT0/capacity 2>/dev/null)
+        local status=$(cat /sys/class/power_supply/BAT0/status 2>/dev/null)
+        battery_info="${percentage}% (${status})"
+    fi
+    echo "${battery_info:-No Battery}"
+}
+
+PREV_T=0; PREV_I=0; PREV_RX=0; PREV_TX=0; TICK=0
+CPU_HISTORY=(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)
+CPU_M=$(awk -F: '/model name/ {print $2; exit}' /proc/cpuinfo 2>/dev/null | sed -e 's/^[ \t]*//' -e 's/ with.*//' | cut -c1-35 || echo "Unknown CPU")
+
+GPU_M=$(glxinfo -B 2>/dev/null | grep -m1 "Device" | cut -d: -f2 | sed 's/^[ \t]*//;s/(.*//')
+if [ -z "$GPU_M" ]; then
+    GPU_M=$(lspci 2>/dev/null | grep -iE 'vga|3d|display' | cut -d: -f3 | sed 's/^[ \t]*//;s/\[.*\]//;s/(rev.*//' | head -n1)
+fi
+GPU_M=$(echo "$GPU_M" | cut -c1-35 || echo "Unknown GPU")
+
+COLORS=(31 33 36 32 35 34 36 31 33)
+
+draw_bar() {
+    local pct=$1
+    local len=${2:-35}
+    local fill=$(( pct * len / 100 ))
+    printf "\e[44m"
+    for ((i=0; i<fill; i++)); do printf "\e[97m█"; done
+    for ((i=fill; i<len; i++)); do printf "\e[90m▒"; done
+    printf "\e[0m"
+}
+
+draw_graph() {
+    local chars=(" " "▁" "▂" "▃" "▄" "▅" "▆" "▇" "█")
+    for val in "${CPU_HISTORY[@]}"; do
+        local b=$(( val * 3 ))
+        (( b > 100 )) && b=100
+        printf "\e[38;5;39m%s" "${chars[$(( b * 8 / 100 ))]}"
+    done
+    printf "\e[0m"
+}
+
+get_disk_info() {
+    local path="$1"
+    local disk_output
+    disk_output=$(df -B1 "$path" 2>/dev/null) || {
+        echo "0 0 0"
+        return 1
+    }
+    
+    local disk_data
+    disk_data=$(echo "$disk_output" | awk 'NR>1 && NF>=6 {
+        used = $3;
+        total = $2;
+        pct = int((used * 100) / total);
+        used_gb = int(used / (1024*1024*1024));
+        total_gb = int(total / (1024*1024*1024));
+        printf "%dG %dG %d", used_gb, total_gb, pct;
+    }' | head -n1)
+    
+    if [ -z "$disk_data" ]; then
+        echo "0 0 0"
+        return 1
+    fi
+    
+    echo "$disk_data"
+    return 0
+}
+
+safe_div() {
+    local numerator="$1"
+    local denominator="$2"
+    if [ "$denominator" -eq 0 ]; then
+        echo "0"
+    else
+        echo $(( numerator * 100 / denominator ))
+    fi
+}
+
+check_dependencies
+
+while true; do
+    read -r _ u n s i w x y z _ < /proc/stat 2>/dev/null || continue
+    T=$((u+n+s+i+w+x+y+z)); I=$((i+w))
+    CPU=$(safe_div $((T - PREV_T - (I - PREV_I))) $((T - PREV_T)))
+    PREV_T=$T; PREV_I=$I
+    CPU_FREQ=$(awk -F: '/cpu MHz/ {print $2; exit}' /proc/cpuinfo 2>/dev/null | xargs | cut -d. -f1 || echo "0")
+
+    L=${CPU_HISTORY[-1]}; D=$(( CPU - L )); O=$CPU
+    if (( D > 5 )); then O=$(( CPU + D * 2 )); elif (( D < -5 )); then O=$(( CPU + D )); fi
+    (( O < 0 )) && O=0; (( O > 100 )) && O=100
+    S=$(( (L * 60 + O * 40) / 100 ))
+    CPU_HISTORY=("${CPU_HISTORY[@]:1}" "$S")
+
+    RAM_DATA=($(free -m 2>/dev/null | awk '/Mem:/ {print $3, $2}'))
+    if [ ${#RAM_DATA[@]} -eq 2 ]; then
+        used=${RAM_DATA[0]}; total=${RAM_DATA[1]}
+        RAM_P=$(safe_div $used $total)
+        RAM_STR="$(awk "BEGIN {printf \"%.2f/%.2f GiB\", $used/1024, $total/1024}")"
+    else
+        RAM_P=0; RAM_STR="0.00/0.00 GiB"
+    fi
+
+    DISK_DATA=($(get_disk_info "$DISK_PATH"))
+    if [ ${#DISK_DATA[@]} -eq 3 ]; then
+        DISK_USED=${DISK_DATA[0]}; DISK_TOTAL=${DISK_DATA[1]}; DISK_P=${DISK_DATA[2]}
+    else
+        DISK_USED="0"; DISK_TOTAL="0"; DISK_P=0
+    fi
+
+    if [ "$PREV_RX" -eq 0 ]; then
+        read RX TX < <(awk 'NR>2 {rx+=$2; tx+=$10} END {print rx, tx}' /proc/net/dev 2>/dev/null || echo "0 0")
+        PREV_RX=$RX; PREV_TX=$TX
+        DL=0; UL=0
+    else
+        read RX TX < <(awk 'NR>2 {rx+=$2; tx+=$10} END {print rx, tx}' /proc/net/dev 2>/dev/null || echo "$PREV_RX $PREV_TX")
+        DL=$(( (RX - PREV_RX) / 1024 )); UL=$(( (TX - PREV_TX) / 1024 ))
+        PREV_RX=$RX; PREV_TX=$TX
+    fi
+
+    # Get temperatures and battery
+    CPU_TEMP=$(get_cpu_temp)
+    GPU_TEMP=$(get_gpu_temp)
+    BATTERY_INFO=$(get_battery_info)
+
+    COLOR_INDEX=$(( TICK % ${#COLORS[@]} ))
+    C="\e[1;${COLORS[$COLOR_INDEX]}m"
+
+    printf "\e[1;1H\e[J\n"
+    printf "      ${C} .MMM.   .MMM.  \e[0m    \e[1;31m> user    \e[90m│ \e[0m%s\n" "$USER"
+    printf "      ${C}.MMMMMM.MMMMMM. \e[0m    \e[1;33m> uptime  \e[90m│ \e[0m%s\n" "$UPTIME"
+    printf "      ${C}MMMMMMMMMMMMMMM \e[0m    \e[1;36m> display \e[90m│ \e[0m%s\n" "$RES"
+    printf "      ${C}MMMMMMMMMMMMMMM \e[0m    \e[1;32m> distro  \e[90m│ \e[0m%s\n" "$OS"
+    printf "      ${C}'MMMMMMMMMMMMM' \e[0m    \e[1;35m> kernel  \e[90m│ \e[0m%s\n" "$KERNEL"
+    printf "      ${C}  'MMMMMMMMM'   \e[0m    \e[1;34m> wm      \e[90m│ \e[0m%s\n" "$WM"
+    printf "      ${C}    'MMMMM'     \e[0m    \e[1;36m> desktop \e[90m│ \e[0m%s\n" "$DE"
+    printf "      ${C}      'M'       \e[0m    \e[1;31m> term    \e[90m│ \e[0m%s\n" "$TERM_N"
+    printf "      ${C}     PULSE      \e[0m    \e[1;33m> shell   \e[90m│ \e[0m%s\n" "$SHELL_V"
+    printf "      \e[1;37m   [$(date +'%H:%M:%S')]\e[0m       \e[1;31m> apps    \e[90m│ \e[0m%s\n" "$PKGS"
+    printf "      \e[90m----------------\e[0m    \e[1;32m> disk    \e[90m│ \e[0m%s%%\n" "$DISK_P"
+    printf "                        \e[1;33m  > OS Age  \e[90m│ \e[0m%s\n" "$OS_AGE"
+
+    printf "\n    \e[1;33mCPU \e[0m %3d%% %s  \e[90m%s MHz\e[0m\n" "$CPU" "$(draw_bar $CPU)" "$CPU_FREQ"
+    printf "    \e[1;35mRAM \e[0m %3d%% %s  \e[90m%s\e[0m\n" "$RAM_P" "$(draw_bar $RAM_P)" "$RAM_STR"
+    printf "    \e[1;34mDSK \e[0m %3d%% %s  \e[90m%s/%s\e[0m\n" "$DISK_P" "$(draw_bar $DISK_P)" "$DISK_USED" "$DISK_TOTAL"
+
+    printf "\n    \e[1;36mHistory: \e[0m%s\n" "$(draw_graph)"
+    printf "    \e[1;32mNet:     \e[0mD:%skb U:%skb\n" "$DL" "$UL"
+    printf "    \e[1;33mCPU:     \e[0m%s @ %s°C\n" "$CPU_M" "$CPU_TEMP"
+    printf "    \e[1;34mGPU:     \e[0m%s @ %s°C\n" "$GPU_M" "$GPU_TEMP"
+    printf "    \e[1;35mBattery: \e[0m%s\n" "$BATTERY_INFO"
+
+    printf "\n  \e[90mCreated by Carlos Corral | Pulse Active | \e[34mhttps://ko-fi.com/retrolcdclock\e[0m\n"
+
+    ((TICK++))
+    read -t 1 -n 1 key && break
+done
