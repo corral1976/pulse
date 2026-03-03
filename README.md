@@ -1,61 +1,62 @@
+Perfect, Carlos. Here is the professional README.md in English. I have formatted the Ko-fi link and your profile link to be directly clickable in GitLab, along with a clean structure for the installation process.
+Markdown
+
 # ⚡ Pulse - System Monitor v1.0
 
-Pulse es un monitor de sistema profesional, minimalista y de alto rendimiento para la terminal. Ha sido diseñado bajo una estética refinada (Expert Mode) para ofrecer una visualización clara de las métricas críticas del hardware con un impacto mínimo en los recursos del sistema.
+Pulse is a professional, minimalist, high-performance system monitor for the terminal. Designed with a refined "Expert Mode" aesthetic, it provides a clear visualization of critical hardware metrics with minimal impact on system resources.
 
-## ✨ Características Principales
-- **Telemetría en Tiempo Real**: Monitoreo dinámico de carga de CPU, frecuencia actual (MHz), uso de memoria RAM, estado de almacenamiento y tráfico de red.
-- **Detección Avanzada de Hardware**: Lógica mejorada para la identificación precisa de diversas arquitecturas de GPU (gráficos integrados y dedicados) y procesadores modernos.
-- **Gráficos Dinámicos**: Historial visual de la carga de CPU integrado directamente en la interfaz mediante caracteres de bloque.
-- **Diseño Optimizado**: Interfaz adaptada para terminales modernas, recomendada para fondos **Dark Blue** (Azul Oscuro).
+## ✨ Key Features
+- **Real-Time Telemetry**: Dynamic monitoring of CPU load, current frequency (MHz), RAM usage, storage status, and network traffic.
+- **Advanced Hardware Detection**: Enhanced logic for accurate identification of various GPU architectures (integrated and dedicated) and modern processors.
+- **Dynamic Graphics**: Visual CPU load history integrated directly into the interface using block characters.
+- **Optimized Design**: Interface tailored for modern terminals, recommended for **Dark Blue** backgrounds.
 
-## 🚀 Instalación y Configuración
+## 🚀 Installation & Configuration
 
-Para una integración profesional en sistemas GNU/Linux, se recomienda instalar Pulse en el directorio de binarios del usuario para que sea accesible de forma global.
+For a professional integration on GNU/Linux systems, it is recommended to install Pulse in the user's local binary directory to make it accessible globally.
 
-### 1. Requisitos del Sistema
-Asegúrate de tener instaladas las dependencias necesarias para la detección de hardware y cálculos de precisión:
+### 1. System Requirements
+Ensure you have the necessary dependencies installed for hardware detection and precision calculations:
 ```bash
 sudo apt update && sudo apt install pciutils bc x11-utils -y
 
-2. Despliegue en el Sistema
+2. System Deployment
 
-Sigue estos pasos para instalar el binario en tu carpeta local de forma correcta:
+Follow these steps to install the binary into your local folder correctly:
 Bash
 
-# Crear la carpeta de binarios local si no existe
+# Create the local bin directory if it doesn't exist
 mkdir -p ~/.local/bin
 
-# Copiar el script a la carpeta de binarios
-# (Asegúrate de ejecutar este comando desde donde descargaste el archivo)
+# Copy the script to the binary folder
+# (Run this command from the directory where you downloaded the file)
 cp pulse ~/.local/bin/
 
-# Otorgar permisos de ejecución al binario
+# Grant execution permissions to the binary
 chmod +x ~/.local/bin/pulse
 
-3. Configuración del PATH
+3. PATH Configuration
 
-Para ejecutar pulse simplemente escribiendo su nombre desde cualquier ubicación, añade la siguiente línea al final de tu archivo ~/.bashrc:
+To run pulse by simply typing its name from any location, add the following line to the end of your ~/.bashrc file:
 Bash
 
 export PATH="$HOME/.local/bin:$PATH"
 
-Tras guardar los cambios, reinicia tu terminal o aplica la configuración con source ~/.bashrc.
-🛠️ Especificaciones Técnicas
+After saving, restart your terminal or apply the changes with source ~/.bashrc.
+🛠️ Technical Specifications
 
-    Fuente de Datos: Extracción eficiente de métricas directamente desde /proc/stat y /proc/net/dev.
+    Data Source: Efficient metric extraction directly from /proc/stat and /proc/net/dev.
 
-    Motor de Renderizado: Desarrollado íntegramente en Bash utilizando secuencias de escape ANSI para máxima compatibilidad y velocidad.
+    Rendering Engine: Developed entirely in Bash using ANSI escape sequences for maximum compatibility and speed.
 
-    Arquitectura: Código limpio sin comentarios redundantes, optimizado para entornos de usuario avanzado.
+    Architecture: Clean code without redundant comments, optimized for advanced users.
 
-❤️ Apoya el Proyecto
+☕ Support the Project
 
-Pulse es un proyecto creado para hacer la vida de los usuarios más fácil. Si te resulta útil, puedes apoyar su desarrollo invitándome a un café:
+Pulse was created to make users' lives easier. If you find it useful, please consider supporting its development:
 
-☕ Support Pulse
+👉 Buy Me A Coffee
 
 Created with ❤️ by Carlos Corral
 
-Link de donación: https://ko-fi.com/retrolcdclock
-
-| Pulse Active | 2026
+Pulse Active | 2026
