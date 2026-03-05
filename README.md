@@ -23,6 +23,10 @@ Pulse requires the following dependencies for full functionality:
 ```bash
 sudo apt update && sudo apt install lm-sensors upower pciutils bc x11-utils -y
 ```
+##Dependencies by Distro:
+Debian/Ubuntu/Mint: sudo apt install bc pciutils mesa-utils
+Fedora: sudo dnf install bc pciutils mesa-utils
+Arch Linux: sudo pacman -S bc pciutils mesa-utils
 
 ### Sensor Configuration
 Configure temperature sensors for accurate readings:
