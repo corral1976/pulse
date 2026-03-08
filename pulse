@@ -117,9 +117,29 @@ draw_bar() {
         for ((i=fill; i<len; i++)); do printf "\e[90m▒"; done
         printf "\e[0m"
     else
-        # TTY mode with ASCII only
-        for ((i=0; i<fill; i++)); do printf "#"; done
-        for ((i=fill; i<len; i++)); do printf "."; done
+        # TTY mode mejorado con caracteres más visuales
+        local bar_char="#"
+        local empty_char="."
+        
+        # Añadir indicadores de nivel en TTY
+        if [ "$pct" -ge 80 ]; then
+            bar_char="!"  # Alto uso - alerta
+        elif [ "$pct" -ge 60 ]; then
+            bar_char="*"  # Uso medio-alto
+        elif [ "$pct" -ge 40 ]; then
+            bar_char="+"  # Uso medio
+        elif [ "$pct" -ge 20 ]; then
+            bar_char="-"  # Uso bajo-medio
+        else
+            bar_char="|"  # Uso muy bajo
+        fi
+        
+        # Dibujar barra con indicadores
+        for ((i=0; i<fill; i++)); do printf "$bar_char"; done
+        for ((i=fill; i<len; i++)); do printf "$empty_char"; done
+        
+        # Añadir porcentaje numérico al final en TTY
+        printf " [%d%%]" "$pct"
     fi
 }
 
@@ -202,8 +222,6 @@ if [ "$TERM_TYPE" = "gui" ]; then
     printf "\e[H\e[J\n"
 else
     clear
-    printf "PULSE - System Monitor (TTY Mode)\n"
-    printf "================================\n\n"
 fi
 
 # Render based on terminal type
@@ -234,28 +252,57 @@ if [ "$TERM_TYPE" = "gui" ]; then
 
     printf "\n  \e[90mCreated by Carlos Corral | Pulse Active | \e[34mhttps://ko-fi.com/retrolcdclock\e[0m\n"
 else
-    # TTY mode - ASCII only, no colors
-    printf "USER: %s\n" "$USER"
-    printf "UPTIME: %s\n" "$UPTIME"
-    printf "KERNEL: %s\n" "$KERNEL"
-    printf "OS: %s\n" "$OS"
-    printf "SHELL: %s\n" "$SHELL_V"
-    printf "TIME: $(date +'%H:%M:%S')\n"
-    printf "APPS: %s\n" "$PKGS"
-    printf "DISK: %s%%\n" "$DISK_P"
-    printf "OS AGE: %s\n" "$OS_AGE"
-
-    printf "\nCPU: %3d%% %s  %s MHz\n" "$CPU" "$(draw_bar $CPU)" "$CPU_FREQ"
-    printf "RAM: %3d%% %s  %s\n" "$RAM_P" "$(draw_bar $RAM_P)" "$RAM_STR"
-    printf "DSK: %3d%% %s  %s/%s\n" "$DISK_P" "$(draw_bar $DISK_P)" "$DISK_USED" "$DISK_TOTAL"
-
-    printf "\nHistory: %s\n" "$(draw_graph)"
-    printf "Net: D:%skb U:%skb\n" "$DL" "$UL"
-    printf "CPU: %s @ %sC\n" "$CPU_M" "$CPU_TEMP"
-    printf "GPU: %s @ %sC\n" "$GPU_M" "$GPU_TEMP"
-    printf "Battery: %s\n" "$BATTERY_INFO"
-
-    printf "\nCreated by Carlos Corral | Pulse Active\n"
+    # TTY mode mejorado con formato ASCII y más información
+    
+    # Título más grande y centrado (solo una vez)
+    printf "╔════════════════════════════════════════════════════════════════╗\n"
+    printf "║                    PULSE - System Monitor (TTY Mode)           ║\n"
+    printf "║                    Universal Edition v1.1                      ║\n"
+    printf "╚════════════════════════════════════════════════════════════════╝\n\n"
+    
+    # Corazón ASCII art para TTY - simétrico y bien formado
+    printf "       .MMM.   .MMM.  \n"
+    printf "     .MMMMMMM.MMMMMMM. \n"
+    printf "      MMMMMMMMMMMMMMM \n"
+    printf "      MMMMMMMMMMMMMMM \n"
+    printf "      'MMMMMMMMMMMMM' \n"
+    printf "        'MMMMMMMMM'   \n"
+    printf "          'MMMMM'     \n"
+    printf "            'M'       \n"
+    printf "        PULSE-ACTIVE  \n"
+    printf "         [%s]\n\n" "$(date +'%H:%M:%S')"
+    
+    # SYSTEM INFO - Sin recuadro, diseño simple
+    printf "SYSTEM INFO:\n"
+    printf "  User: %s\n" "${USER}"
+    printf "  Time: %s\n" "$(date +'%H:%M')"
+    printf "  Shell: %s\n" "${SHELL_V##*/}"
+    printf "  Host: %s\n" "$(hostname)"
+    printf "  Uptime: %s\n" "${UPTIME}"
+    printf "  Kernel: %s\n" "${KERNEL}"
+    printf "  OS: %s\n" "${OS}"
+    printf "  Apps: %s\n" "${PKGS}"
+    printf "  OS Age: %s\n\n" "${OS_AGE}"
+    
+    # PERFORMANCE METRICS - Sin recuadro
+    printf "PERFORMANCE METRICS:\n"
+    printf "  CPU: %3d%% %-20s %5s MHz\n" "$CPU" "$(draw_bar $CPU 20)" "$(printf "%5s" "$CPU_FREQ")"
+    printf "  RAM: %3d%% %-20s %5s GiB\n" "$RAM_P" "$(draw_bar $RAM_P 20)" "$(printf "%5s" "${RAM_STR%%/*}")"
+    printf "  DSK: %3d%% %-20s %4s/%4s\n\n" "$DISK_P" "$(draw_bar $DISK_P 20)" "$DISK_USED" "$DISK_TOTAL"
+    
+    # TEMPERATURES & HARDWARE - Sin recuadro, diseño simple
+    printf "TEMPERATURES & HARDWARE:\n"
+    printf "  CPU: %s @ %s°C\n" "${CPU_M}" "$CPU_TEMP"
+    printf "  GPU: %s @ %s°C\n" "${GPU_M}" "$GPU_TEMP"
+    printf "  Battery: %s\n\n" "${BATTERY_INFO}"
+    
+    # NETWORK & HISTORY - Sin recuadro
+    printf "NETWORK & HISTORY:\n"
+    printf "  Net: Down:%7skb │ Up:%7skb │ History: %-18s\n" "$(printf "%7s" "$DL")" "$(printf "%7s" "$UL")" "$(draw_graph)"
+    printf "\n"
+    
+    # FOOTER - Sin recuadro
+    printf "PULSE ACTIVE v1.1 - Universal System Monitor - TTY Mode - Carlos Corral 2026\n"
 fi
 
     ((TICK++))
