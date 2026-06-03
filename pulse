@@ -1,15 +1,80 @@
 #!/bin/bash
-# pulse-v1.1 - Universal Edition (TTY + GUI)
+# pulse-v1.2 - Universal Edition (TTY + GUI)
+# Improved version with better compatibility and error handling
+
+# Default settings
+REFRESH_INTERVAL=1
+QUIET_MODE=false
+SHOW_HELP=false
+SHOW_VERSION=false
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -i|--interval)
+            REFRESH_INTERVAL="$2"
+            shift 2
+            ;;
+        -q|--quiet)
+            QUIET_MODE=true
+            shift
+            ;;
+        -h|--help)
+            SHOW_HELP=true
+            shift
+            ;;
+        -v|--version)
+            SHOW_VERSION=true
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            SHOW_HELP=true
+            shift
+            ;;
+    esac
+done
+
+# Show help
+if [ "$SHOW_HELP" = true ]; then
+    echo "Pulse v1.2 - System Monitor"
+    echo "Usage: pulse [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  -i, --interval SECONDS  Set refresh interval (default: 1)"
+    echo "  -q, --quiet             Quiet mode (minimal output)"
+    echo "  -h, --help              Show this help message"
+    echo "  -v, --version           Show version information"
+    echo ""
+    echo "Environment Variables:"
+    echo "  DISK_PATH              Disk partition to monitor (default: /)"
+    echo "  WM                     Override window manager detection"
+    exit 0
+fi
+
+# Show version
+if [ "$SHOW_VERSION" = true ]; then
+    echo "Pulse v1.2 - Universal Edition (TTY + GUI)"
+    echo "Created by Carlos Corral | Pulse Active | 2026"
+    exit 0
+fi
 
 # Detect terminal type
 detect_terminal() {
-    if [ -n "$DISPLAY" ] && command -v xdpyinfo >/dev/null 2>&1; then
-        echo "gui"
+    local term_type="unknown"
+    
+    # Check for Wayland first
+    if [ -n "${WAYLAND_DISPLAY:-}" ] || [ -n "${XDG_SESSION_TYPE:-}" ] && [ "$XDG_SESSION_TYPE" = "wayland" ]; then
+        term_type="gui"
+    # Then check for X11
+    elif [ -n "${DISPLAY:-}" ] && command -v xdpyinfo >/dev/null 2>&1; then
+        term_type="gui"
+    # Finally check for TTY
     elif [ -t 1 ] && [ -t 2 ]; then
-        echo "tty"
-    else
-        echo "unknown"
+        term_type="tty"
     fi
+    
+    echo "$term_type"
 }
 
 # Save original terminal settings
@@ -39,8 +104,36 @@ fi
 
 DISK_PATH="${DISK_PATH:-/}"
 
+# Validate DISK_PATH
+if [ ! -d "$DISK_PATH" ]; then
+    echo "Error: DISK_PATH '$DISK_PATH' does not exist or is not a directory" >&2
+    DISK_PATH="/"
+fi
+
+get_package_count() {
+    local pkg_count="0 (unknown)"
+    local flatpak_count=0
+    
+    # Try different package managers
+    if command -v dpkg-query >/dev/null 2>&1; then
+        pkg_count="$(dpkg-query -f '.\n' -W 2>/dev/null | wc -l) (dpkg)"
+    elif command -v rpm >/dev/null 2>&1; then
+        pkg_count="$(rpm -qa 2>/dev/null | wc -l) (rpm)"
+    elif command -v pacman >/dev/null 2>&1; then
+        pkg_count="$(pacman -Q 2>/dev/null | wc -l) (pacman)"
+    fi
+    
+    # Add flatpak count if available
+    if command -v flatpak >/dev/null 2>&1; then
+        flatpak_count=$(flatpak list 2>/dev/null | wc -l)
+        pkg_count="$pkg_count, $flatpak_count (flatpak)"
+    fi
+    
+    echo "$pkg_count"
+}
+
 check_dependencies() {
-    local deps=("df" "awk" "free" "uname" "uptime" "lspci" "glxinfo" "xdpyinfo" "bc" "xargs")
+    local deps=("df" "awk" "free" "uname" "uptime" "lspci" "bc" "xargs")
     for dep in "${deps[@]}"; do
         if ! command -v "$dep" >/dev/null 2>&1; then
             echo "Warning: Optional dependency '$dep' not found" >&2
@@ -56,14 +149,27 @@ DE="${XDG_CURRENT_DESKTOP:-GNOME}"
 WM="${WM:-Mutter (X11)}"
 TERM_N="${TERM_PROGRAM:-konsole}"
 SHELL_V="$SHELL $(echo $BASH_VERSION | cut -d'(' -f1)"
-PKGS="$(dpkg-query -f '.\n' -W 2>/dev/null | wc -l) (dpkg), $(flatpak list 2>/dev/null | wc -l) (flatpak)"
+PKGS="$(get_package_count)"
 OS_AGE="$(( ($(date +%s) - $(stat -c %W / 2>/dev/null || echo $(date +%s))) / 86400 )) days"
 
 get_cpu_temp() {
     local temp=0
+    local sensors_output
+    local current_time
+    
     if command -v sensors >/dev/null 2>&1; then
-        temp=$(sensors 2>/dev/null | grep -E 'Tctl|Core 0|Package id|CPUTIN' | head -1 | grep -o '[+-][0-9]\+\.[0-9]\+' | head -1)
-        [ -z "$temp" ] && temp=$(sensors 2>/dev/null | grep 'k10temp' -A 3 | grep -o '[+-][0-9]\+\.[0-9]\+' | head -1)
+        current_time=$(date +%s)
+        # Use cache if still valid
+        if [ -n "$SENSORS_CACHE" ] && [ $((current_time - SENSORS_CACHE_TIME)) -lt $CACHE_TTL ]; then
+            sensors_output="$SENSORS_CACHE"
+        else
+            sensors_output=$(sensors 2>/dev/null)
+            SENSORS_CACHE="$sensors_output"
+            SENSORS_CACHE_TIME=$current_time
+        fi
+        
+        temp=$(echo "$sensors_output" | grep -E 'Tctl|Core 0|Package id|CPUTIN' | head -1 | grep -o '[+-][0-9]\+\.[0-9]\+' | head -1)
+        [ -z "$temp" ] && temp=$(echo "$sensors_output" | grep 'k10temp' -A 3 | grep -o '[+-][0-9]\+\.[0-9]\+' | head -1)
     elif [ -f /sys/class/thermal/thermal_zone0/temp ]; then
         temp=$(awk '{print $1/1000}' /sys/class/thermal/thermal_zone0/temp 2>/dev/null)
     fi
@@ -72,27 +178,58 @@ get_cpu_temp() {
 
 get_gpu_temp() {
     local temp=0
+    local sensors_output
+    local nvidia_output
+    local current_time
+    
     if command -v sensors >/dev/null 2>&1; then
-        temp=$(sensors 2>/dev/null | grep -A 5 'amdgpu' | grep 'edge' | grep -o '[+-][0-9]\+\.[0-9]\+' | head -1)
-        if [ -z "$temp" ] && command -v nvidia-smi >/dev/null 2>&1; then
-            temp=$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits 2>/dev/null)
+        current_time=$(date +%s)
+        # Use cache if still valid
+        if [ -n "$SENSORS_CACHE" ] && [ $((current_time - SENSORS_CACHE_TIME)) -lt $CACHE_TTL ]; then
+            sensors_output="$SENSORS_CACHE"
+        else
+            sensors_output=$(sensors 2>/dev/null)
+            SENSORS_CACHE="$sensors_output"
+            SENSORS_CACHE_TIME=$current_time
         fi
-        [ -z "$temp" ] && temp=$(sensors 2>/dev/null | grep -A 3 'nvme' | grep 'Composite' | grep -o '[+-][0-9]\+\.[0-9]\+' | head -1)
+        
+        temp=$(echo "$sensors_output" | grep -A 5 'amdgpu' | grep 'edge' | grep -o '[+-][0-9]\+\.[0-9]\+' | head -1)
+        if [ -z "$temp" ] && command -v nvidia-smi >/dev/null 2>&1; then
+            current_time=$(date +%s)
+            # Use cache if still valid
+            if [ -n "$NVIDIA_CACHE" ] && [ $((current_time - NVIDIA_CACHE_TIME)) -lt $CACHE_TTL ]; then
+                nvidia_output="$NVIDIA_CACHE"
+            else
+                nvidia_output=$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits 2>/dev/null)
+                NVIDIA_CACHE="$nvidia_output"
+                NVIDIA_CACHE_TIME=$current_time
+            fi
+            [ -n "$nvidia_output" ] && temp="$nvidia_output"
+        fi
+        [ -z "$temp" ] && temp=$(echo "$sensors_output" | grep -A 3 'nvme' | grep 'Composite' | grep -o '[+-][0-9]\+\.[0-9]\+' | head -1)
     fi
     echo "${temp:-0}"
 }
 
 get_battery_info() {
     local battery_info=""
+    local battery
+    local percentage
+    local state
+    local capacity
+    local status
+    
     if command -v upower >/dev/null 2>&1; then
-        local battery=$(upower -e 2>/dev/null | grep battery | head -1)
+        battery=$(upower -e 2>/dev/null | grep battery | head -1)
         if [ -n "$battery" ]; then
-            local percentage=$(upower -i "$battery" 2>/dev/null | grep percentage | grep -o '[0-9]\+%' | head -1)
-            local state=$(upower -i "$battery" 2>/dev/null | grep state | awk '{print $2}' | head -1)
+            percentage=$(upower -i "$battery" 2>/dev/null | grep percentage | grep -o '[0-9]\+%' | head -1)
+            state=$(upower -i "$battery" 2>/dev/null | grep state | awk '{print $2}' | head -1)
             [ -n "$percentage" ] && battery_info="${percentage} (${state})"
         fi
     elif [ -f /sys/class/power_supply/BAT0/capacity ]; then
-        battery_info="$(cat /sys/class/power_supply/BAT0/capacity 2>/dev/null)% ($(cat /sys/class/power_supply/BAT0/status 2>/dev/null))"
+        capacity=$(cat /sys/class/power_supply/BAT0/capacity 2>/dev/null)
+        status=$(cat /sys/class/power_supply/BAT0/status 2>/dev/null)
+        battery_info="${capacity}% (${status})"
     fi
     echo "${battery_info:-No Battery}"
 }
@@ -101,6 +238,13 @@ PREV_T=0; PREV_I=0; PREV_RX=0; PREV_TX=0; TICK=0
 CPU_HISTORY=(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)
 CPU_M=$(awk -F: '/model name/ {print $2; exit}' /proc/cpuinfo 2>/dev/null | sed -e 's/^[ \t]*//;s/ with.*//' | cut -c1-35 || echo "Unknown CPU")
 
+# Cache for external commands
+SENSORS_CACHE=""
+SENSORS_CACHE_TIME=0
+NVIDIA_CACHE=""
+NVIDIA_CACHE_TIME=0
+CACHE_TTL=5  # Cache TTL in seconds
+
 GPU_M=$(glxinfo -B 2>/dev/null | grep -m1 "Device" | cut -d: -f2 | sed 's/^[ \t]*//;s/(.*//')
 [ -z "$GPU_M" ] && GPU_M=$(lspci 2>/dev/null | grep -iE 'vga|3d|display' | cut -d: -f3 | sed 's/^[ \t]*//;s/\[.*\]//;s/(rev.*//' | head -n1)
 GPU_M=$(echo "$GPU_M" | cut -c1-35 || echo "Unknown GPU")
@@ -108,52 +252,54 @@ GPU_M=$(echo "$GPU_M" | cut -c1-35 || echo "Unknown GPU")
 COLORS=(31 33 36 32 35 34 36 31 33)
 
 draw_bar() {
-    local pct=$1; local len=${2:-35}; local fill=$(( pct * len / 100 ))
+    local pct=$1
+    local len=${2:-35}
+    local fill=$(( pct * len / 100 ))
+    local i
+    local bar_char
+    local empty_char
     
     if [ "$TERM_TYPE" = "gui" ] && $USE_COLORS; then
-        # GUI mode with colors and Unicode
         printf "\e[44m"
         for ((i=0; i<fill; i++)); do printf "\e[97m█"; done
         for ((i=fill; i<len; i++)); do printf "\e[90m▒"; done
         printf "\e[0m"
     else
-        # TTY mode mejorado con caracteres más visuales
-        local bar_char="#"
-        local empty_char="."
+        bar_char="#"
+        empty_char="."
         
-        # Añadir indicadores de nivel en TTY
         if [ "$pct" -ge 80 ]; then
-            bar_char="!"  # Alto uso - alerta
+            bar_char="!"
         elif [ "$pct" -ge 60 ]; then
-            bar_char="*"  # Uso medio-alto
+            bar_char="*"
         elif [ "$pct" -ge 40 ]; then
-            bar_char="+"  # Uso medio
+            bar_char="+"
         elif [ "$pct" -ge 20 ]; then
-            bar_char="-"  # Uso bajo-medio
+            bar_char="-"
         else
-            bar_char="|"  # Uso muy bajo
+            bar_char="|"
         fi
         
-        # Dibujar barra con indicadores
         for ((i=0; i<fill; i++)); do printf "$bar_char"; done
         for ((i=fill; i<len; i++)); do printf "$empty_char"; done
-        
-        # Añadir porcentaje numérico al final en TTY
         printf " [%d%%]" "$pct"
     fi
 }
 
 draw_graph() {
+    local val
+    local b
+    local chars
+    
     if [ "$TERM_TYPE" = "gui" ] && $USE_UNICODE; then
-        # GUI mode with Unicode blocks
-        local chars=(" " "▁" "▂" "▃" "▄" "▅" "▆" "▇" "█")
+        chars=(" " "▁" "▂" "▃" "▄" "▅" "▆" "▇" "█")
         for val in "${CPU_HISTORY[@]}"; do
-            local b=$(( val * 3 )); (( b > 100 )) && b=100
+            b=$(( val * 3 ))
+            (( b > 100 )) && b=100
             printf "\e[38;5;39m%s" "${chars[$(( b * 8 / 100 ))]}"
         done
         printf "\e[0m"
     else
-        # TTY mode with ASCII
         for val in "${CPU_HISTORY[@]}"; do
             if [ "$val" -lt 10 ]; then
                 printf "."
@@ -173,13 +319,18 @@ draw_graph() {
 }
 
 get_disk_info() {
-    df -B1 "$1" 2>/dev/null | awk 'NR>1 && NF>=6 {
+    local disk_path="$1"
+    df -B1 "$disk_path" 2>/dev/null | awk 'NR>1 && NF>=6 {
         used=$3; total=$2; pct=int((used*100)/total);
         printf "%dG %dG %d", used/(1024^3), total/(1024^3), pct;
     }' || echo "0 0 0"
 }
 
-safe_div() { [ "$2" -eq 0 ] && echo "0" || echo $(( $1 * 100 / $2 )); }
+safe_div() {
+    local numerator=$1
+    local denominator=$2
+    [ "$denominator" -eq 0 ] && echo "0" || echo $(( numerator * 100 / denominator ))
+}
 
 check_dependencies
 
@@ -190,7 +341,10 @@ while true; do
     PREV_T=$T; PREV_I=$I
     CPU_FREQ=$(awk -F: '/cpu MHz/ {print $2; exit}' /proc/cpuinfo 2>/dev/null | xargs | cut -d. -f1 || echo "0")
 
-    L=${CPU_HISTORY[-1]}; D=$(( CPU - L )); O=$CPU
+    hist_len=${#CPU_HISTORY[@]}
+    L=${CPU_HISTORY[$((hist_len - 1))]}
+    D=$(( CPU - L ))
+    O=$CPU
     if (( D > 5 )); then O=$(( CPU + D * 2 )); elif (( D < -5 )); then O=$(( CPU + D )); fi
     (( O < 0 )) && O=0; (( O > 100 )) && O=100
     S=$(( (L * 60 + O * 40) / 100 ))
@@ -306,5 +460,5 @@ else
 fi
 
     ((TICK++))
-    read -t 1 -n 1 key && break
+    read -t "$REFRESH_INTERVAL" -n 1 key && break
 done
