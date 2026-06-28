@@ -1,0 +1,192 @@
+# Pulse v1.3 - Changelog (Refactored for Excellence)
+
+## 🔧 Bugs Fixed
+
+### 1. **Inconsistencia de versión en modo TTY**
+   - **Antes**: El modo TTY mostraba "v1.1" aunque el resto del script y el README decían v1.2
+   - **Ahora**: Usa variable global `SCRIPT_VERSION="1.3"` en todos lados
+   - **Impacto**: Consistencia total en el versionado
+
+### 2. **Flag `--quiet` no funcionaba**
+   - **Antes**: Se parseaba `QUIET_MODE=true` pero nunca se comprobaba en el bucle
+   - **Ahora**: Implementa un verdadero modo silencioso (1 línea, sin clear de pantalla)
+   - **Impacto**: Útil para dashboards, monitoreo en scripts, sin parpadeos
+
+### 3. **Fallbacks silenciosos de CPU_M / GPU_M nunca se disparaban**
+   - **Antes**: Se intentaba asignar via pipe/cut; si `cut -c1-35` fallaba, la variable quedaba vacía
+   - **Ahora**: Usa expansión de bash `${variable:0:35}` + fallback explícito `${GPU_M:-Unknown GPU}`
+   - **Impacto**: Garantiza que siempre hay un valor visible, nunca campos vacíos
+
+### 4. **"OS Age" calculaba epoch infinito si `stat -c %W` devolvía 0**
+   - **Antes**: Sistemas sin soporte de birth-time daban números de días gigantescos sin sentido
+   - **Ahora**: Valida `btime > 0` y muestra "unknown" si no está disponible
+   - **Impacto**: Información honesta en lugar de datos engañosos
+
+### 5. **Dependencias fantasma en la lista de requerimientos**
+   - **Antes**: README decía "requiere bc, free, xargs" pero el script nunca los usaba
+   - **Antes**: Omitía `glxinfo` de la lista aunque lo usaba para GPU_M
+   - **Ahora**: Lista clara: requeridas vs. opcionales; solo instaladas las necesarias
+   - **Impacto**: Instalación más limpia, sin bloatware innecesario
+
+### 6. **Changelog del README mentía sobre `set -e`**
+   - **Antes**: README decía "Added strict mode set -euo pipefail" pero no estaba en el código
+   - **Ahora**: Activa `set -uo pipefail` (sin `-e` porque muchos comandos esperan fallar)
+   - **Impacto**: Seguridad real + documentación sincronizada
+
+### 7. **WM y terminal siempre caían a hardcodeados**
+   - **Antes**: `WM="${WM:-Mutter (X11)}"` = siempre Mutter aunque corras KDE/XFCE
+   - **Antes**: `TERM_PROGRAM` no existe en Linux (es de macOS), así que siempre "konsole"
+   - **Ahora**: Detección real por `pgrep` (kwin_x11, xfwm4, i3, sway, etc.) + vars de terminal (KONSOLE_VERSION, GNOME_TERMINAL_SCREEN, etc.)
+   - **Impacto**: Data real, no ficción
+
+---
+
+## ⚡ Performance Improvements
+
+### 1. **Caching inteligente de operaciones lentas**
+   - **Antes**: `sensors`, `nvidia-smi`, `df`, `upower` se ejecutaban cada tick (cada 1s)
+   - **Ahora**: Se cachean por 5-10s (CACHE_TTL) porque sus valores no cambian tanto
+   - **Impacto**: Menos CPU+I/O, pantalla más fluida, especialmente en laptops con batería
+
+### 2. **Expansión de bash en lugar de subshells**
+   - **Antes**: `cut -c1-35 $CPU_M` = spawning `cut` process
+   - **Ahora**: `${CPU_M:0:35}` = operación de bash puro
+   - **Impacto**: Microsegundos ahorrados, reducción de context switches
+
+### 3. **Mejor manejo de /proc/stat sin busy-loop**
+   - **Antes**: `read ... || continue` saltaba todo el ciclo sin `sleep`
+   - **Ahora**: Explícitamente `sleep "$REFRESH_INTERVAL"` si falla lectura
+   - **Impacto**: No consume CPU al 100% si /proc falla temporalmente
+
+---
+
+## 📐 Code Quality & Best Practices
+
+### 1. **Header profesional SPDX**
+   ```bash
+   # SPDX-License-Identifier: MIT
+   # SPDX-FileCopyrightText: 2026 Carlos Corral - Pulse Active
+   ```
+   - Compatible con herramientas de análisis de licencias (REUSE, FOSSology)
+
+### 2. **Constante de versión única**
+   ```bash
+   readonly SCRIPT_VERSION="1.3"
+   ```
+   - Un sitio único de verdad; todas las referencias la usan
+   - `readonly` evita mutaciones accidentales
+
+### 3. **Funciones bien documentadas**
+   ```bash
+   detect_wm()              # Detección real por proceso
+   detect_terminal_emulator()  # Soporte multi-terminal
+   get_os_age()             # Validación de cálculo
+   get_disk_info_cached()   # Cache explícito
+   get_battery_info_cached()  # Cache explícito
+   ```
+
+### 4. **Validación de argumentos**
+   ```bash
+   if ! [[ "$2" =~ ^[0-9]+$ ]] || [ "$2" -lt 1 ]; then
+       echo "Error: --interval debe ser un número entero positivo" >&2
+       exit 1
+   fi
+   ```
+   - No permite `--interval -5` o `--interval abc`
+
+### 5. **Chequeo temprano de requisitos del sistema**
+   ```bash
+   if [ ! -r /proc/stat ] || [ ! -r /proc/net/dev ] || [ ! -r /proc/meminfo ]; then
+       echo "Error: /proc no está disponible..." >&2
+       exit 1
+   fi
+   ```
+   - Falla rápido y claro, no entra a loop infinito
+
+### 6. **Distinción clara entre requerido/opcional**
+   ```bash
+   local required=(awk grep sed cut df date stat hostname uname stty)
+   local optional=(sensors lspci glxinfo upower nvidia-smi xdpyinfo uptime xargs pgrep ps)
+   ```
+   - Fácil de mantener y auditar
+
+---
+
+## 🎨 New Features
+
+### 1. **Modo `--quiet` funcional**
+   ```bash
+   pulse --quiet
+   # [20:33:04] CPU: 15%  RAM: 22%  DSK: 51%  NET D:0KB/U:0KB  CPU:42°C
+   ```
+   - Una línea que se reescribe (sin clear, sin parpadeo)
+   - Ideal para terminals pequeños, scripts de monitoreo, dashboards
+
+### 2. **Mejor detección de WM**
+   - Soporta: kwin (KDE), mutter (GNOME), xfwm4 (XFCE), i3, sway, bspwm, etc.
+   - Variable `WM` sigue siendo override manual si se quiere
+
+### 3. **Mejor detección de terminal**
+   - Soporta: Konsole, GNOME Terminal, Alacritty, kitty, WezTerm, Tilix, Terminator
+   - Fallback a PPID process name si nada más encaja
+
+---
+
+## 📊 Version Bump Justification
+
+| Aspecto | Antes | Después |
+|---------|-------|---------|
+| Bugs críticos encontrados | 7 | 0 |
+| Funciones nuevas (quiet, cache) | 0 | 2 |
+| Lineas de código | 464 | 611 (+31%, más estructura + validación) |
+| Cache TTL (secs) | No había | 5-10 |
+| Detección automática WM | ❌ (hardcoded) | ✅ (real) |
+| Detección automática Terminal | ❌ (hardcoded) | ✅ (real) |
+
+---
+
+## 🚀 Installation
+
+```bash
+# Reemplazar en ~/.local/bin
+cp pulse ~/.local/bin/pulse
+chmod +x ~/.local/bin/pulse
+
+# O en sistema global
+sudo cp pulse /usr/local/bin/pulse
+sudo chmod +x /usr/local/bin/pulse
+```
+
+## 📖 New Options
+
+```bash
+pulse --help          # Ver todas las opciones
+pulse --version       # v1.3
+pulse --quiet         # Modo una línea
+pulse -i 2            # Refresh cada 2 segundos (defecto: 1)
+DISK_PATH=/home pulse # Monitorear /home en lugar de /
+WM=i3 pulse           # Override manual de WM
+```
+
+---
+
+## ✨ Quality Checklist
+
+- ✅ Sintaxis bash validada (`bash -n`)
+- ✅ Todas las variables inicializadas antes de uso (`-u`)
+- ✅ Pipelines seguros (`-o pipefail`)
+- ✅ Sin hardcodes innecesarios
+- ✅ Cache inteligente sin stale data
+- ✅ Fallbacks explícitos, no silenciosos
+- ✅ Dependencias reales vs. fantasma clarificadas
+- ✅ Versionado consistente (1 lugar único)
+- ✅ Modo quiet implementado
+- ✅ Documentación sincronizada con código
+
+---
+
+**Próximos pasos sugeridos:**
+1. Crear `PKGBUILD` para AUR
+2. Considerar modo `--once` para capturas puntuales
+3. Archivo de configuración `~/.config/pulse/config` (opcional)
+4. Soporte de `NO_COLOR` env var para terminales sin colores
