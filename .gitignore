@@ -1,0 +1,19 @@
+# Build artifacts
+*.deb
+*.tar.gz
+*.zip
+
+# Debian build
+debian/DEBIAN/md5sums
+debian/DEBIAN/conffiles
+
+# Temporary files
+*.swp
+*.swo
+*~
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
