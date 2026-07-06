@@ -1,0 +1,17 @@
+#!/usr/bin/env xdg-open
+[Desktop Entry]
+Categories=System;Monitor;
+Comment=Universal System Monitor (TTY + GUI)
+Exec=/home/moshi/.local/bin/pulse
+Icon=/home/moshi/.local/share/icons/pulse.svg
+Name=Pulse Monitor
+NoDisplay=false
+Path=
+PrefersNonDefaultGPU=false
+StartupNotify=true
+Terminal=true
+TerminalOptions=
+Type=Application
+Version=1.0
+X-KDE-SubstituteUID=false
+X-KDE-Username=
