@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <rect x="0" y="0" width="48" height="48" fill="#000000" rx="8" ry="8" />
+  <text x="24" y="10" font-family="monospace" font-size="3" fill="#FF0000" text-anchor="middle" font-weight="bold">.MMM.   .MMM.</text>
+  <text x="24" y="15" font-family="monospace" font-size="3" fill="#FF0000" text-anchor="middle" font-weight="bold">.MMMMMM.MMMMMMM.</text>
+  <text x="24" y="20" font-family="monospace" font-size="3" fill="#FF0000" text-anchor="middle" font-weight="bold"> MMMMMMMMMMMMMM</text>
+  <text x="24" y="25" font-family="monospace" font-size="3" fill="#FF0000" text-anchor="middle" font-weight="bold">'MMMMMMMMMMMMM'</text>
+  <text x="24" y="30" font-family="monospace" font-size="3" fill="#FF0000" text-anchor="middle" font-weight="bold">  'MMMMMMMMM'</text>
+  <text x="24" y="35" font-family="monospace" font-size="3" fill="#FF0000" text-anchor="middle" font-weight="bold">    'MMMMM'</text>
+  <text x="24" y="40" font-family="monospace" font-size="3" fill="#FF0000" text-anchor="middle" font-weight="bold">      'M'</text>
+</svg>
