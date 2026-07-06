@@ -532,7 +532,8 @@ if [ "$TERM_TYPE" = "gui" ]; then
     printf "    \e[1;34mGPU:     \e[0m%s @ %s°C\n" "$GPU_M" "$GPU_TEMP"
     printf "    \e[1;35mBattery: \e[0m%s\n" "$BATTERY_INFO"
 
-    printf "\n  \e[90mCreated by Carlos Corral | Pulse Active | \e[34mhttps://gitlab.com/corral1976/pulse\e[0m\n"
+    printf "\n  \e[90mCreated by Carlos Corral | Pulse Active v${SCRIPT_VERSION}\e[0m\n"
+    printf "  \e[90mRepository: \e[34mhttps://gitlab.com/corral1976/pulse\e[0m\n"
     printf "  \e[90mSupport: \e[34mhttps://ko-fi.com/retrolcdclock\e[0m\n"
 else
     
