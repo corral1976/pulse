@@ -1,9 +1,13 @@
-#!/usr/bin/env xdg-open
 [Desktop Entry]
 Categories=System;Monitor;
+Comment[es_MX]=Universal System Monitor (TTY + GUI)
 Comment=Universal System Monitor (TTY + GUI)
 Exec=/home/moshi/.local/bin/pulse
+GenericName[es_MX]=
+GenericName=
 Icon=/home/moshi/.local/share/icons/pulse.svg
+MimeType=
+Name[es_MX]=Pulse Monitor
 Name=Pulse Monitor
 NoDisplay=false
 Path=
