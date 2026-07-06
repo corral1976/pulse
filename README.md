@@ -71,6 +71,125 @@ WM=i3 pulse              # Override window manager
 - Linux system
 - Optional: `lm-sensors` (temperatures), `nvidia-utils` (GPU), `upower` (battery)
 
+## Troubleshooting
+
+If Pulse doesn't display all information correctly, you may need to install optional dependencies:
+
+### Temperature monitoring (lm-sensors)
+**Debian:**
+```bash
+sudo apt update
+sudo apt install lm-sensors
+sudo sensors-detect
+```
+
+**Ubuntu:**
+```bash
+sudo apt update
+sudo apt install lm-sensors
+sudo sensors-detect
+```
+
+**Linux Mint:**
+```bash
+sudo apt update
+sudo apt install lm-sensors
+sudo sensors-detect
+```
+
+**Fedora/RHEL/CentOS:**
+```bash
+sudo dnf install lm_sensors
+sudo sensors-detect
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S lm_sensors
+sudo sensors-detect
+```
+
+### GPU monitoring
+For NVIDIA GPUs, install the appropriate drivers:
+**Debian:**
+```bash
+sudo apt install nvidia-utils
+```
+
+**Ubuntu:**
+```bash
+sudo apt install nvidia-utils
+```
+
+**Linux Mint:**
+```bash
+sudo apt install nvidia-utils
+```
+
+**Fedora/RHEL/CentOS:**
+```bash
+sudo dnf install nvidia-utils
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S nvidia-utils
+```
+
+For AMD/Intel GPUs, temperature monitoring is handled by lm-sensors (see above).
+
+### Battery monitoring (upower)
+**Debian:**
+```bash
+sudo apt install upower
+```
+
+**Ubuntu:**
+```bash
+sudo apt install upower
+```
+
+**Linux Mint:**
+```bash
+sudo apt install upower
+```
+
+**Fedora/RHEL/CentOS:**
+```bash
+sudo dnf install upower
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S upower
+```
+
+### GPU information (glxinfo)
+**Debian:**
+```bash
+sudo apt install mesa-utils
+```
+
+**Ubuntu:**
+```bash
+sudo apt install mesa-utils
+```
+
+**Linux Mint:**
+```bash
+sudo apt install mesa-utils
+```
+
+**Fedora/RHEL/CentOS:**
+```bash
+sudo dnf install mesa-utils
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S mesa-utils
+```
+
 ## License
 
 MIT - See LICENSE.md
