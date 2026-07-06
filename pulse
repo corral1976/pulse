@@ -11,15 +11,13 @@
 # is explicit rather than relying on a pipeline's exit status.
 set -uo pipefail
 
-readonly SCRIPT_VERSION="1.3"
+readonly SCRIPT_VERSION="1.4"
 
-# Default settings
 REFRESH_INTERVAL=1
 QUIET_MODE=false
 SHOW_HELP=false
 SHOW_VERSION=false
 
-# Parse command line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
         -i|--interval)
@@ -54,7 +52,6 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Show help
 if [ "$SHOW_HELP" = true ]; then
     echo "Pulse v${SCRIPT_VERSION} - System Monitor"
     echo "Usage: pulse [OPTIONS]"
@@ -71,24 +68,19 @@ if [ "$SHOW_HELP" = true ]; then
     exit 0
 fi
 
-# Show version
 if [ "$SHOW_VERSION" = true ]; then
     echo "Pulse v${SCRIPT_VERSION} - Universal Edition (TTY + GUI)"
     echo "Created by Carlos Corral | Pulse Active | 2026"
     exit 0
 fi
 
-# Detect terminal type
 detect_terminal() {
     local term_type="unknown"
     
-    # Check for Wayland first
     if [ -n "${WAYLAND_DISPLAY:-}" ] || [ -n "${XDG_SESSION_TYPE:-}" ] && [ "$XDG_SESSION_TYPE" = "wayland" ]; then
         term_type="gui"
-    # Then check for X11
     elif [ -n "${DISPLAY:-}" ] && command -v xdpyinfo >/dev/null 2>&1; then
         term_type="gui"
-    # Finally check for TTY
     elif [ -t 1 ] && [ -t 2 ]; then
         term_type="tty"
     fi
@@ -96,10 +88,8 @@ detect_terminal() {
     echo "$term_type"
 }
 
-# Save original terminal settings
 ORIGINAL_STTY=$(stty -g 2>/dev/null || echo "")
 
-# Cleanup function
 cleanup() {
     printf "\e[?1049l\e[?25h\e[0m" 2>/dev/null || true
     stty "$ORIGINAL_STTY" 2>/dev/null || true
@@ -108,10 +98,8 @@ cleanup() {
 
 trap cleanup INT TERM EXIT
 
-# Terminal detection
 TERM_TYPE=$(detect_terminal)
 
-# Setup based on terminal type
 if [ "$TERM_TYPE" = "gui" ]; then
     printf "\e[?1049h\e[?25l"
     USE_COLORS=true
@@ -123,7 +111,6 @@ fi
 
 DISK_PATH="${DISK_PATH:-/}"
 
-# Validate DISK_PATH
 if [ ! -d "$DISK_PATH" ]; then
     echo "Error: DISK_PATH '$DISK_PATH' does not exist or is not a directory" >&2
     DISK_PATH="/"
@@ -487,8 +474,7 @@ while true; do
     S=$(( (L * 60 + O * 40) / 100 ))
     CPU_HISTORY=("${CPU_HISTORY[@]:1}" "$S")
 
-    # RAM Universal (/proc/meminfo)
-    if [ -r /proc/meminfo ]; then
+        if [ -r /proc/meminfo ]; then
         TOTAL_K=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
         AVAIL_K=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
         used_k=$((TOTAL_K - AVAIL_K))
@@ -509,8 +495,6 @@ while true; do
     C="\e[1;${COLORS[$(( TICK % ${#COLORS[@]} ))]}m"
 
     if [ "$QUIET_MODE" = true ]; then
-        # Modo silencioso: una sola línea que se reescribe en su lugar,
-        # sin limpiar toda la pantalla en cada tick (cero parpadeo).
         printf "\r\e[K[%s] CPU:%3d%%  RAM:%3d%%  DSK:%3d%%  NET D:%dKB/U:%dKB  CPU:%s°C" \
             "$(date +'%H:%M:%S')" "$CPU" "$RAM_P" "$DISK_P" "$DL" "$UL" "$CPU_TEMP"
         ((TICK++))
@@ -518,16 +502,13 @@ while true; do
         continue
     fi
 
-    # Refresco de pantalla adaptativo
 if [ "$TERM_TYPE" = "gui" ]; then
     printf "\e[H\e[J\n"
 else
     clear
 fi
 
-# Render based on terminal type
 if [ "$TERM_TYPE" = "gui" ]; then
-    # GUI mode with colors and Unicode
     printf "      ${C} .MMM.   .MMM.  \e[0m    \e[1;31m> user    \e[90m│ \e[0m%s\n" "$USER"
     printf "      ${C}.MMMMMM.MMMMMM. \e[0m    \e[1;33m> uptime  \e[90m│ \e[0m%s\n" "$UPTIME"
     printf "      ${C}MMMMMMMMMMMMMMM \e[0m    \e[1;36m> display \e[90m│ \e[0m%s\n" "$RES"
@@ -554,17 +535,14 @@ if [ "$TERM_TYPE" = "gui" ]; then
     printf "\n  \e[90mCreated by Carlos Corral | Pulse Active | \e[34mhttps://gitlab.com/corral1976/pulse\e[0m\n"
     printf "  \e[90mSupport: \e[34mhttps://ko-fi.com/retrolcdclock\e[0m\n"
 else
-    # TTY mode mejorado con formato ASCII y más información
     
-    # Título más grande y centrado (solo una vez)
     printf "╔════════════════════════════════════════════════════════════════╗\n"
     printf "║                    PULSE - System Monitor (TTY Mode)           ║\n"
     printf "║                    Universal Edition v%-25s║\n" "${SCRIPT_VERSION}"
     printf "╚════════════════════════════════════════════════════════════════╝\n\n"
     
-    # Corazón ASCII art para TTY - simétrico y bien formado
     printf "       .MMM.   .MMM.  \n"
-    printf "     .MMMMMMM.MMMMMMM. \n"
+    printf "     .MMMMMM.MMMMMMM. \n"
     printf "      MMMMMMMMMMMMMMM \n"
     printf "      MMMMMMMMMMMMMMM \n"
     printf "      'MMMMMMMMMMMMM' \n"
@@ -574,7 +552,6 @@ else
     printf "        PULSE-ACTIVE  \n"
     printf "         [%s]\n\n" "$(date +'%H:%M:%S')"
     
-    # SYSTEM INFO - Sin recuadro, diseño simple
     printf "SYSTEM INFO:\n"
     printf "  User: %s\n" "${USER}"
     printf "  Time: %s\n" "$(date +'%H:%M')"
@@ -586,19 +563,16 @@ else
     printf "  Apps: %s\n" "${PKGS}"
     printf "  OS Age: %s\n\n" "${OS_AGE}"
     
-    # PERFORMANCE METRICS - Sin recuadro
     printf "PERFORMANCE METRICS:\n"
     printf "  CPU: %3d%% %-20s %5s MHz\n" "$CPU" "$(draw_bar $CPU 20)" "$(printf "%5s" "$CPU_FREQ")"
     printf "  RAM: %3d%% %-20s %5s GiB\n" "$RAM_P" "$(draw_bar $RAM_P 20)" "$(printf "%5s" "${RAM_STR%%/*}")"
     printf "  DSK: %3d%% %-20s %4s/%4s\n\n" "$DISK_P" "$(draw_bar $DISK_P 20)" "$DISK_USED" "$DISK_TOTAL"
     
-    # TEMPERATURES & HARDWARE - Sin recuadro, diseño simple
     printf "TEMPERATURES & HARDWARE:\n"
     printf "  CPU: %s @ %s°C\n" "${CPU_M}" "$CPU_TEMP"
     printf "  GPU: %s @ %s°C\n" "${GPU_M}" "$GPU_TEMP"
     printf "  Battery: %s\n\n" "${BATTERY_INFO}"
     
-    # NETWORK & HISTORY - Sin recuadro
     printf "NETWORK & HISTORY:\n"
     printf "  Net: Down:%7skb │ Up:%7skb │ History: %-18s\n" "$(printf "%7s" "$DL")" "$(printf "%7s" "$UL")" "$(draw_graph)"
     printf "\n"
