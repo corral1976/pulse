@@ -1,28 +1,46 @@
-# Pulse - System Monitor
+# Pulse - System Monitor v1.4
 
 ![Pulse Preview](./preview.png)
 
 Real-time monitoring of CPU, RAM, disk, network, and temperatures in your terminal.
 
-## Install
+## Installation
 
+To install Pulse v1.4, follow these steps:
+
+### 1. Copy the script to your bin folder
 ```bash
-# Copy the script to your bin folder
 cp pulse ~/.local/bin/
 chmod +x ~/.local/bin/pulse
+```
 
-# Add to PATH if needed
+### 2. Copy the desktop file to applications folder
+```bash
+cp pulse.desktop ~/.local/share/applications/
+```
+
+### 3. Copy the icon to icons folder
+```bash
+cp pulse.svg ~/.local/share/icons/
+```
+
+### 4. Add to PATH if needed
+```bash
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
+```
 
-# Test
+### 5. Test installation
+```bash
 pulse --version
 ```
 
-Or system-wide:
+Or system-wide installation:
 ```bash
 sudo cp pulse /usr/local/bin/
 sudo chmod +x /usr/local/bin/pulse
+sudo cp pulse.desktop /usr/share/applications/
+sudo cp pulse.svg /usr/share/icons/
 ```
 
 ## Usage
