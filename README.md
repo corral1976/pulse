@@ -149,3 +149,6 @@ sudo pacman -S mesa-utils
 ## License
 
 MIT - See LICENSE.md
+
+Support
+https://ko-fi.com/retrolcdclock
