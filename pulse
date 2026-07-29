@@ -11,12 +11,13 @@
 # is explicit rather than relying on a pipeline's exit status.
 set -uo pipefail
 
-readonly SCRIPT_VERSION="1.4"
+readonly SCRIPT_VERSION="1.5"
 
 REFRESH_INTERVAL=1
 QUIET_MODE=false
 SHOW_HELP=false
 SHOW_VERSION=false
+NO_COLOR_FLAG=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -34,6 +35,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -q|--quiet)
             QUIET_MODE=true
+            shift
+            ;;
+        -n|--no-color)
+            NO_COLOR_FLAG=true
             shift
             ;;
         -h|--help)
@@ -59,6 +64,7 @@ if [ "$SHOW_HELP" = true ]; then
     echo "Options:"
     echo "  -i, --interval SECONDS  Set refresh interval (default: 1)"
     echo "  -q, --quiet             Quiet mode (single-line minimal output)"
+    echo "  -n, --no-color          Disable colored output (plain text, even in GUI mode)"
     echo "  -h, --help              Show this help message"
     echo "  -v, --version           Show version information"
     echo ""
@@ -100,13 +106,82 @@ trap cleanup INT TERM EXIT
 
 TERM_TYPE=$(detect_terminal)
 
+# Detección de soporte de color real del terminal en vez de asumir 256
+# colores solo porque estamos en modo GUI. `tput colors` devuelve -1 si
+# no puede determinarlo (por ejemplo TERM=dumb), en cuyo caso se trata
+# como "sin color" para no llenar la pantalla de secuencias de escape
+# crudas visibles.
+detect_color_support() {
+    local n=-1
+    if command -v tput >/dev/null 2>&1; then
+        n=$(tput colors 2>/dev/null || echo -1)
+    fi
+    echo "$n"
+}
+
 if [ "$TERM_TYPE" = "gui" ]; then
     printf "\e[?1049h\e[?25l"
-    USE_COLORS=true
     USE_UNICODE=true
+    if [ "$NO_COLOR_FLAG" = true ]; then
+        USE_COLORS=false
+        COLOR_MODE="none"
+    else
+        TERM_COLORS=$(detect_color_support)
+        if [ "$TERM_COLORS" -ge 256 ] 2>/dev/null; then
+            USE_COLORS=true
+            COLOR_MODE="256"
+        elif [ "$TERM_COLORS" -ge 8 ] 2>/dev/null; then
+            USE_COLORS=true
+            COLOR_MODE="16"
+        else
+            USE_COLORS=false
+            COLOR_MODE="none"
+        fi
+    fi
 else
     USE_COLORS=false
     USE_UNICODE=false
+    COLOR_MODE="none"
+fi
+
+# Paleta pastel centralizada. Si el terminal no soporta 256 colores, se
+# usan equivalentes en negrita de la paleta ANSI de 16 colores (el bold
+# es lo que da el efecto "claro/pastel" en la mayoría de terminales).
+# Si no hay soporte de color en absoluto (TTY o --no-color), todas las
+# variables quedan vacías y los printf de abajo simplemente no emiten
+# secuencias de escape.
+if [ "$COLOR_MODE" = "256" ]; then
+    RESET=$'\e[0m'
+    COL_G1=$'\e[1;38;5;117m'   # azul pastel  - user, uptime, display
+    COL_G2=$'\e[1;38;5;120m'   # verde pastel - distro, kernel, wm
+    COL_G3=$'\e[1;38;5;141m'   # lavanda      - desktop, term, shell
+    COL_G4=$'\e[1;38;5;215m'   # durazno      - apps, disk, OS Age
+    COL_BAR_LOW=$'\e[38;5;120m'
+    COL_BAR_MED=$'\e[38;5;222m'
+    COL_BAR_HIGH=$'\e[38;5;210m'
+    COL_BAR_EMPTY=$'\e[90m'
+    COL_BAR_FILL_TXT=$'\e[38;5;235m'
+    COL_DIM=$'\e[90m'
+    COL_WHITE=$'\e[1;37m'
+    COL_GRAPH=$'\e[38;5;117m'
+elif [ "$COLOR_MODE" = "16" ]; then
+    RESET=$'\e[0m'
+    COL_G1=$'\e[1;34m'
+    COL_G2=$'\e[1;32m'
+    COL_G3=$'\e[1;35m'
+    COL_G4=$'\e[1;33m'
+    COL_BAR_LOW=$'\e[1;32m'
+    COL_BAR_MED=$'\e[1;33m'
+    COL_BAR_HIGH=$'\e[1;31m'
+    COL_BAR_EMPTY=$'\e[37m'
+    COL_BAR_FILL_TXT=$'\e[30m'
+    COL_DIM=$'\e[37m'
+    COL_WHITE=$'\e[1;37m'
+    COL_GRAPH=$'\e[1;34m'
+else
+    RESET=""; COL_G1=""; COL_G2=""; COL_G3=""; COL_G4=""
+    COL_BAR_LOW=""; COL_BAR_MED=""; COL_BAR_HIGH=""; COL_BAR_EMPTY=""; COL_BAR_FILL_TXT=""
+    COL_DIM=""; COL_WHITE=""; COL_GRAPH=""
 fi
 
 DISK_PATH="${DISK_PATH:-/}"
@@ -127,7 +202,6 @@ get_package_count() {
     local pkg_count="0 (unknown)"
     local flatpak_count=0
     
-    # Try different package managers
     if command -v dpkg-query >/dev/null 2>&1; then
         pkg_count="$(dpkg-query -f '.\n' -W 2>/dev/null | wc -l) (dpkg)"
     elif command -v rpm >/dev/null 2>&1; then
@@ -136,7 +210,6 @@ get_package_count() {
         pkg_count="$(pacman -Q 2>/dev/null | wc -l) (pacman)"
     fi
     
-    # Add flatpak count if available
     if command -v flatpak >/dev/null 2>&1; then
         flatpak_count=$(flatpak list 2>/dev/null | wc -l)
         pkg_count="$pkg_count, $flatpak_count (flatpak)"
@@ -219,11 +292,30 @@ get_os_age() {
     # birth time del directorio raíz; en filesystems/instalaciones donde no
     # se soporta, stat devuelve 0 — mejor mostrar "unknown" que un número
     # de días sin sentido calculado desde el epoch.
-    local btime now
+    local btime now days years months rem_days
     btime=$(stat -c %W / 2>/dev/null)
     now=$(date +%s)
     if [[ "$btime" =~ ^[0-9]+$ ]] && [ "$btime" -gt 0 ]; then
-        echo "$(( (now - btime) / 86400 )) days"
+        days=$(( (now - btime) / 86400 ))
+        if [ "$days" -ge 365 ]; then
+            years=$(( days / 365 ))
+            months=$(( (days % 365) / 30 ))
+            if [ "$months" -gt 0 ]; then
+                echo "${years}y ${months}m"
+            else
+                echo "${years}y"
+            fi
+        elif [ "$days" -ge 60 ]; then
+            months=$(( days / 30 ))
+            rem_days=$(( days % 30 ))
+            if [ "$rem_days" -gt 0 ]; then
+                echo "${months}m ${rem_days}d"
+            else
+                echo "${months}m"
+            fi
+        else
+            echo "${days} days"
+        fi
     else
         echo "unknown"
     fi
@@ -244,13 +336,12 @@ PKGS="$(get_package_count)"
 OS_AGE="$(get_os_age)"
 
 get_cpu_temp() {
-    local temp=0
+    local temp=""
     local sensors_output
     local current_time
     
     if command -v sensors >/dev/null 2>&1; then
         current_time=$(date +%s)
-        # Use cache if still valid
         if [ -n "$SENSORS_CACHE" ] && [ $((current_time - SENSORS_CACHE_TIME)) -lt $CACHE_TTL ]; then
             sensors_output="$SENSORS_CACHE"
         else
@@ -264,18 +355,17 @@ get_cpu_temp() {
     elif [ -f /sys/class/thermal/thermal_zone0/temp ]; then
         temp=$(awk '{print $1/1000}' /sys/class/thermal/thermal_zone0/temp 2>/dev/null)
     fi
-    echo "${temp:-0}"
+    echo "${temp:-N/A}"
 }
 
 get_gpu_temp() {
-    local temp=0
+    local temp=""
     local sensors_output
     local nvidia_output
     local current_time
     
     if command -v sensors >/dev/null 2>&1; then
         current_time=$(date +%s)
-        # Use cache if still valid
         if [ -n "$SENSORS_CACHE" ] && [ $((current_time - SENSORS_CACHE_TIME)) -lt $CACHE_TTL ]; then
             sensors_output="$SENSORS_CACHE"
         else
@@ -287,7 +377,6 @@ get_gpu_temp() {
         temp=$(echo "$sensors_output" | grep -A 5 'amdgpu' | grep 'edge' | grep -o '[+-][0-9]\+\.[0-9]\+' | head -1)
         if [ -z "$temp" ] && command -v nvidia-smi >/dev/null 2>&1; then
             current_time=$(date +%s)
-            # Use cache if still valid
             if [ -n "$NVIDIA_CACHE" ] && [ $((current_time - NVIDIA_CACHE_TIME)) -lt $CACHE_TTL ]; then
                 nvidia_output="$NVIDIA_CACHE"
             else
@@ -299,7 +388,7 @@ get_gpu_temp() {
         fi
         [ -z "$temp" ] && temp=$(echo "$sensors_output" | grep -A 3 'nvme' | grep 'Composite' | grep -o '[+-][0-9]\+\.[0-9]\+' | head -1)
     fi
-    echo "${temp:-0}"
+    echo "${temp:-N/A}"
 }
 
 get_battery_info() {
@@ -331,8 +420,6 @@ CPU_M=$(awk -F: '/model name/ {print $2; exit}' /proc/cpuinfo 2>/dev/null | sed 
 CPU_M="${CPU_M:-Unknown CPU}"
 CPU_M="${CPU_M:0:35}"
 
-# Cache for external commands (evita relanzar sensors/nvidia-smi/df/upower
-# en cada tick; estos valores no cambian de forma significativa cada 1s)
 SENSORS_CACHE=""
 SENSORS_CACHE_TIME=0
 NVIDIA_CACHE=""
@@ -380,10 +467,15 @@ draw_bar() {
     local empty_char
     
     if [ "$TERM_TYPE" = "gui" ] && $USE_COLORS; then
-        printf "\e[44m"
-        for ((i=0; i<fill; i++)); do printf "\e[97m█"; done
-        for ((i=fill; i<len; i++)); do printf "\e[90m▒"; done
-        printf "\e[0m"
+        local bar_color="$COL_BAR_LOW"
+        if [ "$pct" -ge 85 ]; then
+            bar_color="$COL_BAR_HIGH"
+        elif [ "$pct" -ge 60 ]; then
+            bar_color="$COL_BAR_MED"
+        fi
+        for ((i=0; i<fill; i++)); do printf "%s█" "$bar_color"; done
+        for ((i=fill; i<len; i++)); do printf "%s▒" "$COL_BAR_EMPTY"; done
+        printf "%s" "$RESET"
     else
         bar_char="#"
         empty_char="."
@@ -416,9 +508,9 @@ draw_graph() {
         for val in "${CPU_HISTORY[@]}"; do
             b=$(( val * 3 ))
             (( b > 100 )) && b=100
-            printf "\e[38;5;39m%s" "${chars[$(( b * 8 / 100 ))]}"
+            printf "%s%s" "$COL_GRAPH" "${chars[$(( b * 8 / 100 ))]}"
         done
-        printf "\e[0m"
+        printf "%s" "$RESET"
     else
         for val in "${CPU_HISTORY[@]}"; do
             if [ "$val" -lt 10 ]; then
@@ -446,6 +538,15 @@ get_disk_info() {
     }' || echo "0 0 0"
 }
 
+format_temp() {
+    local t="$1"
+    if [ "$t" = "N/A" ] || [ -z "$t" ]; then
+        echo "N/A"
+    else
+        echo "${t}°C"
+    fi
+}
+
 safe_div() {
     local numerator=$1
     local denominator=$2
@@ -463,7 +564,11 @@ while true; do
     CPU=$(safe_div $((T - PREV_T - (I - PREV_I))) $((T - PREV_T)))
     PREV_T=$T; PREV_I=$I
     CPU_FREQ=$(awk -F: '/cpu MHz/ {print $2; exit}' /proc/cpuinfo 2>/dev/null | xargs | cut -d. -f1)
-    CPU_FREQ="${CPU_FREQ:-0}"
+    if [ -z "$CPU_FREQ" ]; then
+        CPU_FREQ_DISP="N/A"
+    else
+        CPU_FREQ_DISP="${CPU_FREQ} MHz"
+    fi
 
     hist_len=${#CPU_HISTORY[@]}
     L=${CPU_HISTORY[$((hist_len - 1))]}
@@ -492,11 +597,17 @@ while true; do
     PREV_RX=$RX; PREV_TX=$TX
 
     CPU_TEMP=$(get_cpu_temp); GPU_TEMP=$(get_gpu_temp); BATTERY_INFO=$(get_battery_info_cached)
-    C="\e[1;${COLORS[$(( TICK % ${#COLORS[@]} ))]}m"
+    CPU_TEMP_DISP=$(format_temp "$CPU_TEMP")
+    GPU_TEMP_DISP=$(format_temp "$GPU_TEMP")
+    if [ "$USE_COLORS" = true ]; then
+        C="\e[1;${COLORS[$(( TICK % ${#COLORS[@]} ))]}m"
+    else
+        C=""
+    fi
 
     if [ "$QUIET_MODE" = true ]; then
-        printf "\r\e[K[%s] CPU:%3d%%  RAM:%3d%%  DSK:%3d%%  NET D:%dKB/U:%dKB  CPU:%s°C" \
-            "$(date +'%H:%M:%S')" "$CPU" "$RAM_P" "$DISK_P" "$DL" "$UL" "$CPU_TEMP"
+        printf "\r\e[K[%s] CPU:%3d%%  RAM:%3d%%  DSK:%3d%%  NET D:%dKB/U:%dKB  CPU:%s" \
+            "$(date +'%H:%M:%S')" "$CPU" "$RAM_P" "$DISK_P" "$DL" "$UL" "$(format_temp "$CPU_TEMP")"
         ((TICK++))
         read -t "$REFRESH_INTERVAL" -n 1 key && break
         continue
@@ -509,32 +620,32 @@ else
 fi
 
 if [ "$TERM_TYPE" = "gui" ]; then
-    printf "      ${C} .MMM.   .MMM.  \e[0m    \e[1;31m> user    \e[90m│ \e[0m%s\n" "$USER"
-    printf "      ${C}.MMMMMM.MMMMMM. \e[0m    \e[1;33m> uptime  \e[90m│ \e[0m%s\n" "$UPTIME"
-    printf "      ${C}MMMMMMMMMMMMMMM \e[0m    \e[1;36m> display \e[90m│ \e[0m%s\n" "$RES"
-    printf "      ${C}MMMMMMMMMMMMMMM \e[0m    \e[1;32m> distro  \e[90m│ \e[0m%s\n" "$OS"
-    printf "      ${C}'MMMMMMMMMMMMM' \e[0m    \e[1;35m> kernel  \e[90m│ \e[0m%s\n" "$KERNEL"
-    printf "      ${C}  'MMMMMMMMM'   \e[0m    \e[1;34m> wm      \e[90m│ \e[0m%s\n" "$WM"
-    printf "      ${C}    'MMMMM'     \e[0m    \e[1;36m> desktop \e[90m│ \e[0m%s\n" "$DE"
-    printf "      ${C}      'M'       \e[0m    \e[1;31m> term    \e[90m│ \e[0m%s\n" "$TERM_N"
-    printf "      ${C}  PULSE-ACTIVE  \e[0m    \e[1;33m> shell   \e[90m│ \e[0m%s\n" "$SHELL_V"
-    printf "      \e[1;37m   [$(date +'%H:%M:%S')]\e[0m       \e[1;31m> apps    \e[90m│ \e[0m%s\n" "$PKGS"
-    printf "      \e[90m----------------\e[0m    \e[1;32m> disk    \e[90m│ \e[0m%s%%\n" "$DISK_P"
-    printf "                        \e[1;33m  > OS Age  \e[90m│ \e[0m%s\n" "$OS_AGE"
+    printf "      ${C} .MMM.   .MMM.  ${RESET}    ${COL_G1}> user    ${COL_DIM}│ ${RESET}%s\n" "$USER"
+    printf "      ${C}.MMMMMM.MMMMMM. ${RESET}    ${COL_G1}> uptime  ${COL_DIM}│ ${RESET}%s\n" "$UPTIME"
+    printf "      ${C}MMMMMMMMMMMMMMM ${RESET}    ${COL_G1}> display ${COL_DIM}│ ${RESET}%s\n" "$RES"
+    printf "      ${C}MMMMMMMMMMMMMMM ${RESET}    ${COL_G2}> distro  ${COL_DIM}│ ${RESET}%s\n" "$OS"
+    printf "      ${C}'MMMMMMMMMMMMM' ${RESET}    ${COL_G2}> kernel  ${COL_DIM}│ ${RESET}%s\n" "$KERNEL"
+    printf "      ${C}  'MMMMMMMMM'   ${RESET}    ${COL_G2}> wm      ${COL_DIM}│ ${RESET}%s\n" "$WM"
+    printf "      ${C}    'MMMMM'     ${RESET}    ${COL_G3}> desktop ${COL_DIM}│ ${RESET}%s\n" "$DE"
+    printf "      ${C}      'M'       ${RESET}    ${COL_G3}> term    ${COL_DIM}│ ${RESET}%s\n" "$TERM_N"
+    printf "      ${C}  PULSE-ACTIVE  ${RESET}    ${COL_G3}> shell   ${COL_DIM}│ ${RESET}%s\n" "$SHELL_V"
+    printf "      ${COL_WHITE}   [$(date +'%H:%M:%S')]${RESET}       ${COL_G4}> apps    ${COL_DIM}│ ${RESET}%s\n" "$PKGS"
+    printf "      ${COL_DIM}----------------${RESET}    ${COL_G4}> disk    ${COL_DIM}│ ${RESET}%s%%\n" "$DISK_P"
+    printf "                        ${COL_G4}  > OS Age  ${COL_DIM}│ ${RESET}%s\n" "$OS_AGE"
 
-    printf "\n    \e[1;33mCPU \e[0m %3d%% %s  \e[90m%s MHz\e[0m\n" "$CPU" "$(draw_bar $CPU)" "$CPU_FREQ"
-    printf "    \e[1;35mRAM \e[0m %3d%% %s  \e[90m%s\e[0m\n" "$RAM_P" "$(draw_bar $RAM_P)" "$RAM_STR"
-    printf "    \e[1;34mDSK \e[0m %3d%% %s  \e[90m%s/%s\e[0m\n" "$DISK_P" "$(draw_bar $DISK_P)" "$DISK_USED" "$DISK_TOTAL"
+    printf "\n    ${COL_G1}CPU ${RESET} %3d%% %s  ${COL_DIM}%s${RESET}\n" "$CPU" "$(draw_bar $CPU)" "$CPU_FREQ_DISP"
+    printf "    ${COL_G2}RAM ${RESET} %3d%% %s  ${COL_DIM}%s${RESET}\n" "$RAM_P" "$(draw_bar $RAM_P)" "$RAM_STR"
+    printf "    ${COL_G3}DSK ${RESET} %3d%% %s  ${COL_DIM}%s/%s${RESET}\n" "$DISK_P" "$(draw_bar $DISK_P)" "$DISK_USED" "$DISK_TOTAL"
 
-    printf "\n    \e[1;36mHistory: \e[0m%s\n" "$(draw_graph)"
-    printf "    \e[1;32mNet:     \e[0mD:%skb U:%skb\n" "$DL" "$UL"
-    printf "    \e[1;33mCPU:     \e[0m%s @ %s°C\n" "$CPU_M" "$CPU_TEMP"
-    printf "    \e[1;34mGPU:     \e[0m%s @ %s°C\n" "$GPU_M" "$GPU_TEMP"
-    printf "    \e[1;35mBattery: \e[0m%s\n" "$BATTERY_INFO"
+    printf "\n    ${COL_G4}History: ${RESET}%s\n" "$(draw_graph)"
+    printf "    ${COL_G1}Net:     ${RESET}D:%skb U:%skb\n" "$DL" "$UL"
+    printf "    ${COL_G2}CPU:     ${RESET}%s @ %s\n" "$CPU_M" "$CPU_TEMP_DISP"
+    printf "    ${COL_G3}GPU:     ${RESET}%s @ %s\n" "$GPU_M" "$GPU_TEMP_DISP"
+    printf "    ${COL_G4}Battery: ${RESET}%s\n" "$BATTERY_INFO"
 
-    printf "\n  \e[90mCreated by Carlos Corral | Pulse Active v${SCRIPT_VERSION}\e[0m\n"
-    printf "  \e[90mRepository: \e[34mhttps://gitlab.com/corral1976/pulse\e[0m\n"
-    printf "  \e[90mSupport: \e[34mhttps://ko-fi.com/retrolcdclock\e[0m\n"
+    printf "\n  ${COL_DIM}Created by Carlos Corral | Pulse Active v${SCRIPT_VERSION}${RESET}\n"
+    printf "  ${COL_DIM}Repository: ${COL_G1}https://gitlab.com/corral1976/pulse${RESET}\n"
+    printf "  ${COL_DIM}Support: ${COL_G1}https://ko-fi.com/retrolcdclock${RESET}\n"
 else
     
     printf "╔════════════════════════════════════════════════════════════════╗\n"
@@ -565,13 +676,13 @@ else
     printf "  OS Age: %s\n\n" "${OS_AGE}"
     
     printf "PERFORMANCE METRICS:\n"
-    printf "  CPU: %3d%% %-20s %5s MHz\n" "$CPU" "$(draw_bar $CPU 20)" "$(printf "%5s" "$CPU_FREQ")"
+    printf "  CPU: %3d%% %-20s %9s\n" "$CPU" "$(draw_bar $CPU 20)" "$(printf "%9s" "$CPU_FREQ_DISP")"
     printf "  RAM: %3d%% %-20s %5s GiB\n" "$RAM_P" "$(draw_bar $RAM_P 20)" "$(printf "%5s" "${RAM_STR%%/*}")"
     printf "  DSK: %3d%% %-20s %4s/%4s\n\n" "$DISK_P" "$(draw_bar $DISK_P 20)" "$DISK_USED" "$DISK_TOTAL"
     
     printf "TEMPERATURES & HARDWARE:\n"
-    printf "  CPU: %s @ %s°C\n" "${CPU_M}" "$CPU_TEMP"
-    printf "  GPU: %s @ %s°C\n" "${GPU_M}" "$GPU_TEMP"
+    printf "  CPU: %s @ %s\n" "${CPU_M}" "$CPU_TEMP_DISP"
+    printf "  GPU: %s @ %s\n" "${GPU_M}" "$GPU_TEMP_DISP"
     printf "  Battery: %s\n\n" "${BATTERY_INFO}"
     
     printf "NETWORK & HISTORY:\n"
