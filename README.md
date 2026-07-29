@@ -1,4 +1,4 @@
-# Pulse - System Monitor v1.4
+# Pulse - System Monitor v1.5
 
 ![Pulse Preview](./preview.png)
 
@@ -6,7 +6,7 @@ Real-time monitoring of CPU, RAM, disk, network, and temperatures in your termin
 
 ## Installation
 
-To install Pulse v1.4, follow these steps:
+To install Pulse v1.5, follow these steps:
 
 ### 1. Copy the script to your bin folder
 ```bash
