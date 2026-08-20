@@ -1,5 +1,7 @@
 # Pulse - System Monitor v1.0.0
 
+![Pulse Preview](preview.png)
+
 A minimalist and elegant system monitor for the terminal, designed for advanced GNU/Linux users. It offers real-time visualization of CPU (including frequency and history graphs), RAM, disk, network, and temperatures, featuring a design optimized for terminals with modern fonts.
 
 ## Features
