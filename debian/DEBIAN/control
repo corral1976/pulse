@@ -1,0 +1,15 @@
+Package: pulse-monitor
+Version: 1.0.0
+Architecture: all
+Installed-Size: 104
+Maintainer: Carlos Corral <corral1976@gmail.com>
+Depends: bash (>= 4.0)
+Recommends: lm-sensors, mesa-utils, pciutils, upower, x11-utils, procps
+Homepage: https://gitlab.com/corral1976/pulse
+Description: A minimalist and elegant system monitor for the terminal
+ Pulse is a real-time system monitor featuring:
+ - Dual-mode display (GUI with colors, TTY with ASCII)
+ - CPU, RAM, disk, network, and temperature metrics
+ - Intelligent caching for performance
+ - Quiet mode for scripting and dashboards
+ - Desktop integration with launcher and icon

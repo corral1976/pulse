@@ -1,46 +1,36 @@
-# Pulse - System Monitor v1.5
+# Pulse - System Monitor v1.0.0
 
-![Pulse Preview](./preview.png)
+A minimalist and elegant system monitor for the terminal, designed for advanced GNU/Linux users. It offers real-time visualization of CPU (including frequency and history graphs), RAM, disk, network, and temperatures, featuring a design optimized for terminals with modern fonts.
 
-Real-time monitoring of CPU, RAM, disk, network, and temperatures in your terminal.
+## Features
+
+- **Dual-mode display**: GUI with colors and TTY with ASCII
+- **Real-time monitoring**: CPU, RAM, disk, network, and temperature metrics
+- **Intelligent caching**: Performance optimization for sensor data
+- **Quiet mode**: Single-line output for scripting and dashboards
+- **Desktop integration**: System launcher and icon
+- **Hardware support**: lm-sensors, NVIDIA/AMD GPU, battery monitoring
 
 ## Installation
 
-To install Pulse v1.5, follow these steps:
+### Debian/Ubuntu (.deb package)
 
-### 1. Copy the script to your bin folder
 ```bash
-cp pulse ~/.local/bin/
-chmod +x ~/.local/bin/pulse
+sudo dpkg -i pulse-monitor_1.0.0_all.deb
 ```
 
-### 2. Copy the desktop file to applications folder
-```bash
-cp pulse.desktop ~/.local/share/applications/
-```
+### Build from source
 
-### 3. Copy the icon to icons folder
 ```bash
-cp pulse.svg ~/.local/share/icons/
-```
+# Clone repository
+git clone https://gitlab.com/corral1976/pulse.git
+cd pulse
 
-### 4. Add to PATH if needed
-```bash
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
-```
+# Build package
+bash BUILD_DEB.sh
 
-### 5. Test installation
-```bash
-pulse --version
-```
-
-Or system-wide installation:
-```bash
-sudo cp pulse /usr/local/bin/
-sudo chmod +x /usr/local/bin/pulse
-sudo cp pulse.desktop /usr/share/applications/
-sudo cp pulse.svg /usr/share/icons/
+# Install
+sudo dpkg -i pulse-monitor_1.0.0_all.deb
 ```
 
 ## Usage
@@ -49,106 +39,73 @@ sudo cp pulse.svg /usr/share/icons/
 pulse              # Start monitoring
 pulse --quiet      # Single-line mode
 pulse -i 2         # Refresh every 2 seconds
+pulse --help       # Show help
+pulse --version    # Show version
 ```
 
 ## Options
 
-- `-h, --help` - Show help
-- `-v, --version` - Show version  
-- `-i, --interval N` - Refresh interval (seconds)
-- `-q, --quiet` - Single-line output
+- `-h, --help` - Show help message
+- `-v, --version` - Show version information
+- `-i, --interval N` - Refresh interval in seconds (default: 1)
+- `-q, --quiet` - Single-line minimal output
+- `-n, --no-color` - Disable colored output
 
-## Environment
+## Environment Variables
 
 ```bash
 DISK_PATH=/home pulse    # Monitor /home instead of /
-WM=i3 pulse              # Override window manager
+WM=i3 pulse              # Override window manager detection
 ```
 
 ## Requirements
 
-- Bash 4.0+
-- Linux system
-- Optional: `lm-sensors` (temperatures), `nvidia-utils` (GPU), `upower` (battery)
+- **Required**: Bash 4.0+, Linux system with /proc
+- **Recommended** for enhanced functionality:
+  - `lm-sensors` (CPU/GPU temperature)
+  - `nvidia-utils` (NVIDIA GPU temperature)
+  - `mesa-utils` (GPU information)
+  - `pciutils` (GPU fallback)
+  - `upower` (battery monitoring)
+  - `x11-utils` (screen resolution)
+  - `procps` (system utilities)
 
-## Troubleshooting
+## Optional Dependencies Installation
 
-If Pulse doesn't display all information correctly, you may need to install optional dependencies:
-
-### Temperature monitoring (lm-sensors)
-**Debian/Ubuntu/Linux Mint:**
+### Debian/Ubuntu/Linux Mint
 ```bash
-sudo apt update
-sudo apt install lm-sensors
+sudo apt install lm-sensors mesa-utils pciutils upower x11-utils procps
 sudo sensors-detect
 ```
 
-**Fedora/RHEL/CentOS:**
+### Fedora/RHEL/CentOS
 ```bash
-sudo dnf install lm_sensors
+sudo dnf install lm_sensors mesa-utils pciutils upower x11-utils procps
 sudo sensors-detect
 ```
 
-**Arch Linux:**
+### Arch Linux
 ```bash
-sudo pacman -S lm_sensors
+sudo pacman -S lm_sensors mesa-utils pciutils upower x11-utils procps
 sudo sensors-detect
 ```
 
-### GPU monitoring
-For NVIDIA GPUs, install the appropriate drivers:
-**Debian/Ubuntu/Linux Mint:**
-```bash
-sudo apt install nvidia-utils
-```
+## Removal
 
-**Fedora/RHEL/CentOS:**
 ```bash
-sudo dnf install nvidia-utils
-```
-
-**Arch Linux:**
-```bash
-sudo pacman -S nvidia-utils
-```
-
-For AMD/Intel GPUs, temperature monitoring is handled by lm-sensors (see above).
-
-### Battery monitoring (upower)
-**Debian/Ubuntu/Linux Mint:**
-```bash
-sudo apt install upower
-```
-
-**Fedora/RHEL/CentOS:**
-```bash
-sudo dnf install upower
-```
-
-**Arch Linux:**
-```bash
-sudo pacman -S upower
-```
-
-### GPU information (glxinfo)
-**Debian/Ubuntu/Linux Mint:**
-```bash
-sudo apt install mesa-utils
-```
-
-**Fedora/RHEL/CentOS:**
-```bash
-sudo dnf install mesa-utils
-```
-
-**Arch Linux:**
-```bash
-sudo pacman -S mesa-utils
+sudo dpkg -r pulse-monitor
 ```
 
 ## License
 
-MIT - See LICENSE.md
+MIT License - See LICENSE file for details.
 
-Support
-https://ko-fi.com/retrolcdclock
+## Support
+
+- **Repository**: https://gitlab.com/corral1976/pulse
+- **Issues**: https://gitlab.com/corral1976/pulse/-/issues
+- **Support**: https://ko-fi.com/retrolcdclock
+
+## Author
+
+Carlos Corral - Pulse Active
