@@ -1,5 +1,9 @@
 # Pulse - System Monitor v1.0.0
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Latest Release](https://img.shields.io/gitlab/v/release/corral1976/pulse)](https://gitlab.com/corral1976/pulse/-/releases)
+[![Pipeline Status](https://gitlab.com/corral1976/pulse/badges/main/pipeline.svg)](https://gitlab.com/corral1976/pulse/-/pipelines)
+
 ![Pulse Preview](preview.png)
 
 A minimalist and elegant system monitor for the terminal, designed for advanced GNU/Linux users. It offers real-time visualization of CPU (including frequency and history graphs), RAM, disk, network, and temperatures, featuring a design optimized for terminals with modern fonts.
