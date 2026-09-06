@@ -41,7 +41,7 @@ echo "Building package..."
 dpkg-deb --build --root-owner-group "$DEBIAN_DIR" "$OUTPUT_FILE"
 
 if [ -f "$OUTPUT_FILE" ]; then
-    SIZE=$(ls -lh "$OUTPUT_FILE" | awk '{print $5}')
+    SIZE=$(stat -c %s "$OUTPUT_FILE" | numfmt --to=iec)
     echo "Package built successfully: $OUTPUT_FILE ($SIZE)"
     echo ""
     echo "Package info:"
