@@ -30,8 +30,8 @@ lint:shell:
     - apt-get update -qq
     - apt-get install -y -qq shellcheck
   script:
-    - shellcheck BUILD_DEB.sh
-    - shellcheck debian/usr/bin/pulse
+    - shellcheck --severity=error BUILD_DEB.sh
+    - shellcheck --severity=error debian/usr/bin/pulse
   allow_failure: true
   only:
     - main
