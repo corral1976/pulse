@@ -331,7 +331,7 @@ RES="${RES:-1366x768 @ 60Hz}"
 DE="${XDG_CURRENT_DESKTOP:-GNOME}"
 WM="${WM:-$(detect_wm)}"
 TERM_N="$(detect_terminal_emulator)"
-SHELL_V="$SHELL $(echo $BASH_VERSION | cut -d'(' -f1)"
+SHELL_V="$SHELL $(echo "$BASH_VERSION" | cut -d'(' -f1)"
 PKGS="$(get_package_count)"
 OS_AGE="$(get_os_age)"
 
@@ -563,7 +563,7 @@ while true; do
     T=$((u+n+s+i+w+x+y+z)); I=$((i+w))
     CPU=$(safe_div $((T - PREV_T - (I - PREV_I))) $((T - PREV_T)))
     PREV_T=$T; PREV_I=$I
-    CPU_FREQ=$(awk -F: '/cpu MHz/ {print $2; exit}' /proc/cpuinfo 2>/dev/null | xargs | cut -d. -f1)
+    CPU_FREQ=$(awk -F: '/cpu MHz/ {print $2; exit}' /proc/cpuinfo 2>/dev/null | xargs -r | cut -d. -f1)
     if [ -z "$CPU_FREQ" ]; then
         CPU_FREQ_DISP="N/A"
     else
