@@ -490,8 +490,10 @@ draw_bar() {
             bar_char="|"
         fi
         
-        for ((i=0; i<fill; i++)); do printf "%s" "$bar_char"; done
-        for ((i=fill; i<len; i++)); do printf "%s" "$empty_char"; done
+        # shellcheck disable=SC2059
+        for ((i=0; i<fill; i++)); do printf "$bar_char"; done
+        # shellcheck disable=SC2059
+        for ((i=fill; i<len; i++)); do printf "$empty_char"; done
         printf " [%d%%]" "$pct"
     fi
 }
@@ -587,7 +589,7 @@ while true; do
         RAM_P=0; RAM_STR="0.00/0.00 GiB"
     fi
 
-    mapfile -t DISK_DATA < <(get_disk_info_cached)
+    read -r -a DISK_DATA < <(get_disk_info_cached)
     DISK_USED=${DISK_DATA[0]}; DISK_TOTAL=${DISK_DATA[1]}; DISK_P=${DISK_DATA[2]}
 
     read -r RX TX < <(awk 'NR>2 {rx+=$2; tx+=$10} END {print rx, tx}' /proc/net/dev 2>/dev/null)
@@ -618,32 +620,55 @@ else
 fi
 
 if [ "$TERM_TYPE" = "gui" ]; then
-    printf "      %s .MMM.   .MMM.  %s    %s> user    %s│ %s%s\n" "$C" "$RESET" "$COL_G1" "$COL_DIM" "$RESET" "$USER"
-    printf "      %s.MMMMMM.MMMMMM. %s    %s> uptime  %s│ %s%s\n" "$C" "$RESET" "$COL_G1" "$COL_DIM" "$RESET" "$UPTIME"
-    printf "      %sMMMMMMMMMMMMMMM %s    %s> display %s│ %s%s\n" "$C" "$RESET" "$COL_G1" "$COL_DIM" "$RESET" "$RES"
-    printf "      %sMMMMMMMMMMMMMMM %s    %s> distro  %s│ %s%s\n" "$C" "$RESET" "$COL_G2" "$COL_DIM" "$RESET" "$OS"
-    printf "      %s'MMMMMMMMMMMMM' %s    %s> kernel  %s│ %s%s\n" "$C" "$RESET" "$COL_G2" "$COL_DIM" "$RESET" "$KERNEL"
-    printf "      %s  'MMMMMMMMM'   %s    %s> wm      %s│ %s%s\n" "$C" "$RESET" "$COL_G2" "$COL_DIM" "$RESET" "$WM"
-    printf "      %s    'MMMMM'     %s    %s> desktop %s│ %s%s\n" "$C" "$RESET" "$COL_G3" "$COL_DIM" "$RESET" "$DE"
-    printf "      %s      'M'       %s    %s> term    %s│ %s%s\n" "$C" "$RESET" "$COL_G3" "$COL_DIM" "$RESET" "$TERM_N"
-    printf "      %s  PULSE-ACTIVE  %s    %s> shell   %s│ %s%s\n" "$C" "$RESET" "$COL_G3" "$COL_DIM" "$RESET" "$SHELL_V"
-    printf "      %s   [%s]%s       %s> apps    %s│ %s%s\n" "$COL_WHITE" "$(date +'%H:%M:%S')" "$RESET" "$COL_G4" "$COL_DIM" "$RESET" "$PKGS"
-    printf "      %s----------------%s    %s> disk    %s│ %s%s%%\n" "$COL_DIM" "$RESET" "$COL_G4" "$COL_DIM" "$RESET" "$DISK_P"
-    printf "                        %s  > OS Age  %s│ %s%s\n" "$COL_G4" "$COL_DIM" "$RESET" "$OS_AGE"
+    # shellcheck disable=SC2059
+    printf "      ${C} .MMM.   .MMM.  ${RESET}    ${COL_G1}> user    ${COL_DIM}│ ${RESET}%s\n" "$USER"
+    # shellcheck disable=SC2059
+    printf "      ${C}.MMMMMM.MMMMMM. ${RESET}    ${COL_G1}> uptime  ${COL_DIM}│ ${RESET}%s\n" "$UPTIME"
+    # shellcheck disable=SC2059
+    printf "      ${C}MMMMMMMMMMMMMMM ${RESET}    ${COL_G1}> display ${COL_DIM}│ ${RESET}%s\n" "$RES"
+    # shellcheck disable=SC2059
+    printf "      ${C}MMMMMMMMMMMMMMM ${RESET}    ${COL_G2}> distro  ${COL_DIM}│ ${RESET}%s\n" "$OS"
+    # shellcheck disable=SC2059
+    printf "      ${C}'MMMMMMMMMMMMM' ${RESET}    ${COL_G2}> kernel  ${COL_DIM}│ ${RESET}%s\n" "$KERNEL"
+    # shellcheck disable=SC2059
+    printf "      ${C}  'MMMMMMMMM'   ${RESET}    ${COL_G2}> wm      ${COL_DIM}│ ${RESET}%s\n" "$WM"
+    # shellcheck disable=SC2059
+    printf "      ${C}    'MMMMM'     ${RESET}    ${COL_G3}> desktop ${COL_DIM}│ ${RESET}%s\n" "$DE"
+    # shellcheck disable=SC2059
+    printf "      ${C}      'M'       ${RESET}    ${COL_G3}> term    ${COL_DIM}│ ${RESET}%s\n" "$TERM_N"
+    # shellcheck disable=SC2059
+    printf "      ${C}  PULSE-ACTIVE  ${RESET}    ${COL_G3}> shell   ${COL_DIM}│ ${RESET}%s\n" "$SHELL_V"
+    # shellcheck disable=SC2059
+    printf "      ${COL_WHITE}   [$(date +'%H:%M:%S')]${RESET}       ${COL_G4}> apps    ${COL_DIM}│ ${RESET}%s\n" "$PKGS"
+    # shellcheck disable=SC2059
+    printf "      ${COL_DIM}----------------${RESET}    ${COL_G4}> disk    ${COL_DIM}│ ${RESET}%s%%\n" "$DISK_P"
+    # shellcheck disable=SC2059
+    printf "                        ${COL_G4}  > OS Age  ${COL_DIM}│ ${RESET}%s\n" "$OS_AGE"
 
-    printf "\n    %sCPU %s %3d%% %s  %s%s%s\n" "$COL_G1" "$RESET" "$CPU" "$(draw_bar "$CPU")" "$COL_DIM" "$CPU_FREQ_DISP" "$RESET"
-    printf "    %sRAM %s %3d%% %s  %s%s%s\n" "$COL_G2" "$RESET" "$RAM_P" "$(draw_bar "$RAM_P")" "$COL_DIM" "$RAM_STR" "$RESET"
-    printf "    %sDSK %s %3d%% %s  %s%s/%s%s\n" "$COL_G3" "$RESET" "$DISK_P" "$(draw_bar "$DISK_P")" "$COL_DIM" "$DISK_USED" "$DISK_TOTAL" "$RESET"
+    # shellcheck disable=SC2059
+    printf "\n    ${COL_G1}CPU ${RESET} %3d%% %s  ${COL_DIM}%s${RESET}\n" "$CPU" "$(draw_bar "$CPU")" "$CPU_FREQ_DISP"
+    # shellcheck disable=SC2059
+    printf "    ${COL_G2}RAM ${RESET} %3d%% %s  ${COL_DIM}%s${RESET}\n" "$RAM_P" "$(draw_bar "$RAM_P")" "$RAM_STR"
+    # shellcheck disable=SC2059
+    printf "    ${COL_G3}DSK ${RESET} %3d%% %s  ${COL_DIM}%s/%s${RESET}\n" "$DISK_P" "$(draw_bar "$DISK_P")" "$DISK_USED" "$DISK_TOTAL"
 
-    printf "\n    %sHistory: %s%s\n" "$COL_G4" "$RESET" "$(draw_graph)"
-    printf "    %sNet:     %sD:%skb U:%skb\n" "$COL_G1" "$RESET" "$DL" "$UL"
-    printf "    %sCPU:     %s%s @ %s\n" "$COL_G2" "$RESET" "$CPU_M" "$CPU_TEMP_DISP"
-    printf "    %sGPU:     %s%s @ %s\n" "$COL_G3" "$RESET" "$GPU_M" "$GPU_TEMP_DISP"
-    printf "    %sBattery: %s%s\n" "$COL_G4" "$RESET" "$BATTERY_INFO"
+    # shellcheck disable=SC2059
+    printf "\n    ${COL_G4}History: ${RESET}%s\n" "$(draw_graph)"
+    # shellcheck disable=SC2059
+    printf "    ${COL_G1}Net:     ${RESET}D:%skb U:%skb\n" "$DL" "$UL"
+    # shellcheck disable=SC2059
+    printf "    ${COL_G2}CPU:     ${RESET}%s @ %s\n" "$CPU_M" "$CPU_TEMP_DISP"
+    # shellcheck disable=SC2059
+    printf "    ${COL_G3}GPU:     ${RESET}%s @ %s\n" "$GPU_M" "$GPU_TEMP_DISP"
+    # shellcheck disable=SC2059
+    printf "    ${COL_G4}Battery: ${RESET}%s\n" "$BATTERY_INFO"
 
-    printf "\n  %sCreated by Carlos Corral | Pulse Active v%s%s\n" "$COL_DIM" "$SCRIPT_VERSION" "$RESET"
-    printf "  %sRepository: %shttps://gitlab.com/corral1976/pulse%s\n" "$COL_DIM" "$COL_G1" "$RESET"
-    printf "  %sSupport: %shttps://ko-fi.com/retrolcdclock%s\n" "$COL_DIM" "$COL_G1" "$RESET"
+    # shellcheck disable=SC2059
+    printf "\n  ${COL_DIM}Created by Carlos Corral | Pulse Active v${SCRIPT_VERSION}${RESET}\n"
+    # shellcheck disable=SC2059
+    printf "  ${COL_DIM}Repository: ${COL_G1}https://gitlab.com/corral1976/pulse${RESET}\n"
+    # shellcheck disable=SC2059
+    printf "  ${COL_DIM}Support: ${COL_G1}https://ko-fi.com/retrolcdclock${RESET}\n"
 else
     
     printf "╔════════════════════════════════════════════════════════════════╗\n"
