@@ -1,7 +1,7 @@
 Package: pulse-monitor
 Version: 1.0.0
 Architecture: all
-Installed-Size: 104
+Installed-Size: 108
 Maintainer: Carlos Corral <corral1976@gmail.com>
 Depends: bash (>= 4.0)
 Recommends: lm-sensors, mesa-utils, pciutils, upower, x11-utils, procps

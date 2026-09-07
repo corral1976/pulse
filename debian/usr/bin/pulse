@@ -160,7 +160,6 @@ if [ "$COLOR_MODE" = "256" ]; then
     COL_BAR_MED=$'\e[38;5;222m'
     COL_BAR_HIGH=$'\e[38;5;210m'
     COL_BAR_EMPTY=$'\e[90m'
-    COL_BAR_FILL_TXT=$'\e[38;5;235m'
     COL_DIM=$'\e[90m'
     COL_WHITE=$'\e[1;37m'
     COL_GRAPH=$'\e[38;5;117m'
@@ -174,13 +173,12 @@ elif [ "$COLOR_MODE" = "16" ]; then
     COL_BAR_MED=$'\e[1;33m'
     COL_BAR_HIGH=$'\e[1;31m'
     COL_BAR_EMPTY=$'\e[37m'
-    COL_BAR_FILL_TXT=$'\e[30m'
     COL_DIM=$'\e[37m'
     COL_WHITE=$'\e[1;37m'
     COL_GRAPH=$'\e[1;34m'
 else
     RESET=""; COL_G1=""; COL_G2=""; COL_G3=""; COL_G4=""
-    COL_BAR_LOW=""; COL_BAR_MED=""; COL_BAR_HIGH=""; COL_BAR_EMPTY=""; COL_BAR_FILL_TXT=""
+    COL_BAR_LOW=""; COL_BAR_MED=""; COL_BAR_HIGH=""; COL_BAR_EMPTY=""
     COL_DIM=""; COL_WHITE=""; COL_GRAPH=""
 fi
 
@@ -492,8 +490,8 @@ draw_bar() {
             bar_char="|"
         fi
         
-        for ((i=0; i<fill; i++)); do printf "$bar_char"; done
-        for ((i=fill; i<len; i++)); do printf "$empty_char"; done
+        for ((i=0; i<fill; i++)); do printf "%s" "$bar_char"; done
+        for ((i=fill; i<len; i++)); do printf "%s" "$empty_char"; done
         printf " [%d%%]" "$pct"
     fi
 }
@@ -589,10 +587,10 @@ while true; do
         RAM_P=0; RAM_STR="0.00/0.00 GiB"
     fi
 
-    DISK_DATA=($(get_disk_info_cached))
+    mapfile -t DISK_DATA < <(get_disk_info_cached)
     DISK_USED=${DISK_DATA[0]}; DISK_TOTAL=${DISK_DATA[1]}; DISK_P=${DISK_DATA[2]}
 
-    read RX TX < <(awk 'NR>2 {rx+=$2; tx+=$10} END {print rx, tx}' /proc/net/dev 2>/dev/null)
+    read -r RX TX < <(awk 'NR>2 {rx+=$2; tx+=$10} END {print rx, tx}' /proc/net/dev 2>/dev/null)
     if [ "$PREV_RX" -eq 0 ]; then DL=0; UL=0; else DL=$(( (RX - PREV_RX) / 1024 )); UL=$(( (TX - PREV_TX) / 1024 )); fi
     PREV_RX=$RX; PREV_TX=$TX
 
@@ -609,7 +607,7 @@ while true; do
         printf "\r\e[K[%s] CPU:%3d%%  RAM:%3d%%  DSK:%3d%%  NET D:%dKB/U:%dKB  CPU:%s" \
             "$(date +'%H:%M:%S')" "$CPU" "$RAM_P" "$DISK_P" "$DL" "$UL" "$(format_temp "$CPU_TEMP")"
         ((TICK++))
-        read -t "$REFRESH_INTERVAL" -n 1 key && break
+        read -r -t "$REFRESH_INTERVAL" -n 1 _ && break
         continue
     fi
 
@@ -620,32 +618,32 @@ else
 fi
 
 if [ "$TERM_TYPE" = "gui" ]; then
-    printf "      ${C} .MMM.   .MMM.  ${RESET}    ${COL_G1}> user    ${COL_DIM}│ ${RESET}%s\n" "$USER"
-    printf "      ${C}.MMMMMM.MMMMMM. ${RESET}    ${COL_G1}> uptime  ${COL_DIM}│ ${RESET}%s\n" "$UPTIME"
-    printf "      ${C}MMMMMMMMMMMMMMM ${RESET}    ${COL_G1}> display ${COL_DIM}│ ${RESET}%s\n" "$RES"
-    printf "      ${C}MMMMMMMMMMMMMMM ${RESET}    ${COL_G2}> distro  ${COL_DIM}│ ${RESET}%s\n" "$OS"
-    printf "      ${C}'MMMMMMMMMMMMM' ${RESET}    ${COL_G2}> kernel  ${COL_DIM}│ ${RESET}%s\n" "$KERNEL"
-    printf "      ${C}  'MMMMMMMMM'   ${RESET}    ${COL_G2}> wm      ${COL_DIM}│ ${RESET}%s\n" "$WM"
-    printf "      ${C}    'MMMMM'     ${RESET}    ${COL_G3}> desktop ${COL_DIM}│ ${RESET}%s\n" "$DE"
-    printf "      ${C}      'M'       ${RESET}    ${COL_G3}> term    ${COL_DIM}│ ${RESET}%s\n" "$TERM_N"
-    printf "      ${C}  PULSE-ACTIVE  ${RESET}    ${COL_G3}> shell   ${COL_DIM}│ ${RESET}%s\n" "$SHELL_V"
-    printf "      ${COL_WHITE}   [$(date +'%H:%M:%S')]${RESET}       ${COL_G4}> apps    ${COL_DIM}│ ${RESET}%s\n" "$PKGS"
-    printf "      ${COL_DIM}----------------${RESET}    ${COL_G4}> disk    ${COL_DIM}│ ${RESET}%s%%\n" "$DISK_P"
-    printf "                        ${COL_G4}  > OS Age  ${COL_DIM}│ ${RESET}%s\n" "$OS_AGE"
+    printf "      %s .MMM.   .MMM.  %s    %s> user    %s│ %s%s\n" "$C" "$RESET" "$COL_G1" "$COL_DIM" "$RESET" "$USER"
+    printf "      %s.MMMMMM.MMMMMM. %s    %s> uptime  %s│ %s%s\n" "$C" "$RESET" "$COL_G1" "$COL_DIM" "$RESET" "$UPTIME"
+    printf "      %sMMMMMMMMMMMMMMM %s    %s> display %s│ %s%s\n" "$C" "$RESET" "$COL_G1" "$COL_DIM" "$RESET" "$RES"
+    printf "      %sMMMMMMMMMMMMMMM %s    %s> distro  %s│ %s%s\n" "$C" "$RESET" "$COL_G2" "$COL_DIM" "$RESET" "$OS"
+    printf "      %s'MMMMMMMMMMMMM' %s    %s> kernel  %s│ %s%s\n" "$C" "$RESET" "$COL_G2" "$COL_DIM" "$RESET" "$KERNEL"
+    printf "      %s  'MMMMMMMMM'   %s    %s> wm      %s│ %s%s\n" "$C" "$RESET" "$COL_G2" "$COL_DIM" "$RESET" "$WM"
+    printf "      %s    'MMMMM'     %s    %s> desktop %s│ %s%s\n" "$C" "$RESET" "$COL_G3" "$COL_DIM" "$RESET" "$DE"
+    printf "      %s      'M'       %s    %s> term    %s│ %s%s\n" "$C" "$RESET" "$COL_G3" "$COL_DIM" "$RESET" "$TERM_N"
+    printf "      %s  PULSE-ACTIVE  %s    %s> shell   %s│ %s%s\n" "$C" "$RESET" "$COL_G3" "$COL_DIM" "$RESET" "$SHELL_V"
+    printf "      %s   [%s]%s       %s> apps    %s│ %s%s\n" "$COL_WHITE" "$(date +'%H:%M:%S')" "$RESET" "$COL_G4" "$COL_DIM" "$RESET" "$PKGS"
+    printf "      %s----------------%s    %s> disk    %s│ %s%s%%\n" "$COL_DIM" "$RESET" "$COL_G4" "$COL_DIM" "$RESET" "$DISK_P"
+    printf "                        %s  > OS Age  %s│ %s%s\n" "$COL_G4" "$COL_DIM" "$RESET" "$OS_AGE"
 
-    printf "\n    ${COL_G1}CPU ${RESET} %3d%% %s  ${COL_DIM}%s${RESET}\n" "$CPU" "$(draw_bar $CPU)" "$CPU_FREQ_DISP"
-    printf "    ${COL_G2}RAM ${RESET} %3d%% %s  ${COL_DIM}%s${RESET}\n" "$RAM_P" "$(draw_bar $RAM_P)" "$RAM_STR"
-    printf "    ${COL_G3}DSK ${RESET} %3d%% %s  ${COL_DIM}%s/%s${RESET}\n" "$DISK_P" "$(draw_bar $DISK_P)" "$DISK_USED" "$DISK_TOTAL"
+    printf "\n    %sCPU %s %3d%% %s  %s%s%s\n" "$COL_G1" "$RESET" "$CPU" "$(draw_bar "$CPU")" "$COL_DIM" "$CPU_FREQ_DISP" "$RESET"
+    printf "    %sRAM %s %3d%% %s  %s%s%s\n" "$COL_G2" "$RESET" "$RAM_P" "$(draw_bar "$RAM_P")" "$COL_DIM" "$RAM_STR" "$RESET"
+    printf "    %sDSK %s %3d%% %s  %s%s/%s%s\n" "$COL_G3" "$RESET" "$DISK_P" "$(draw_bar "$DISK_P")" "$COL_DIM" "$DISK_USED" "$DISK_TOTAL" "$RESET"
 
-    printf "\n    ${COL_G4}History: ${RESET}%s\n" "$(draw_graph)"
-    printf "    ${COL_G1}Net:     ${RESET}D:%skb U:%skb\n" "$DL" "$UL"
-    printf "    ${COL_G2}CPU:     ${RESET}%s @ %s\n" "$CPU_M" "$CPU_TEMP_DISP"
-    printf "    ${COL_G3}GPU:     ${RESET}%s @ %s\n" "$GPU_M" "$GPU_TEMP_DISP"
-    printf "    ${COL_G4}Battery: ${RESET}%s\n" "$BATTERY_INFO"
+    printf "\n    %sHistory: %s%s\n" "$COL_G4" "$RESET" "$(draw_graph)"
+    printf "    %sNet:     %sD:%skb U:%skb\n" "$COL_G1" "$RESET" "$DL" "$UL"
+    printf "    %sCPU:     %s%s @ %s\n" "$COL_G2" "$RESET" "$CPU_M" "$CPU_TEMP_DISP"
+    printf "    %sGPU:     %s%s @ %s\n" "$COL_G3" "$RESET" "$GPU_M" "$GPU_TEMP_DISP"
+    printf "    %sBattery: %s%s\n" "$COL_G4" "$RESET" "$BATTERY_INFO"
 
-    printf "\n  ${COL_DIM}Created by Carlos Corral | Pulse Active v${SCRIPT_VERSION}${RESET}\n"
-    printf "  ${COL_DIM}Repository: ${COL_G1}https://gitlab.com/corral1976/pulse${RESET}\n"
-    printf "  ${COL_DIM}Support: ${COL_G1}https://ko-fi.com/retrolcdclock${RESET}\n"
+    printf "\n  %sCreated by Carlos Corral | Pulse Active v%s%s\n" "$COL_DIM" "$SCRIPT_VERSION" "$RESET"
+    printf "  %sRepository: %shttps://gitlab.com/corral1976/pulse%s\n" "$COL_DIM" "$COL_G1" "$RESET"
+    printf "  %sSupport: %shttps://ko-fi.com/retrolcdclock%s\n" "$COL_DIM" "$COL_G1" "$RESET"
 else
     
     printf "╔════════════════════════════════════════════════════════════════╗\n"
@@ -676,9 +674,9 @@ else
     printf "  OS Age: %s\n\n" "${OS_AGE}"
     
     printf "PERFORMANCE METRICS:\n"
-    printf "  CPU: %3d%% %-20s %9s\n" "$CPU" "$(draw_bar $CPU 20)" "$(printf "%9s" "$CPU_FREQ_DISP")"
-    printf "  RAM: %3d%% %-20s %5s GiB\n" "$RAM_P" "$(draw_bar $RAM_P 20)" "$(printf "%5s" "${RAM_STR%%/*}")"
-    printf "  DSK: %3d%% %-20s %4s/%4s\n\n" "$DISK_P" "$(draw_bar $DISK_P 20)" "$DISK_USED" "$DISK_TOTAL"
+    printf "  CPU: %3d%% %-20s %9s\n" "$CPU" "$(draw_bar "$CPU" 20)" "$(printf "%9s" "$CPU_FREQ_DISP")"
+    printf "  RAM: %3d%% %-20s %5s GiB\n" "$RAM_P" "$(draw_bar "$RAM_P" 20)" "$(printf "%5s" "${RAM_STR%%/*}")"
+    printf "  DSK: %3d%% %-20s %4s/%4s\n\n" "$DISK_P" "$(draw_bar "$DISK_P" 20)" "$DISK_USED" "$DISK_TOTAL"
     
     printf "TEMPERATURES & HARDWARE:\n"
     printf "  CPU: %s @ %s\n" "${CPU_M}" "$CPU_TEMP_DISP"
@@ -695,5 +693,5 @@ else
 fi
 
     ((TICK++))
-    read -t "$REFRESH_INTERVAL" -n 1 key && break
+    read -r -t "$REFRESH_INTERVAL" -n 1 _ && break
 done
