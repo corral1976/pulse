@@ -1,4 +1,4 @@
-# Pulse - System Monitor v1.0.0
+# Pulse - Active v1.0.0
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Latest Release](https://img.shields.io/gitlab/v/release/corral1976/pulse)](https://gitlab.com/corral1976/pulse/-/releases)
