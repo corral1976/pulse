@@ -4,7 +4,7 @@ stages:
   - release
 
 variables:
-  PACKAGE_NAME: "pulse-monitor"
+  PACKAGE_NAME: "pulse-active"
   DEBIAN_FRONTEND: noninteractive
 
 build:deb:
@@ -17,7 +17,7 @@ build:deb:
     - bash BUILD_DEB.sh
   artifacts:
     paths:
-      - pulse-monitor_*.deb
+      - pulse-active_*.deb
     expire_in: 30 days
   only:
     - main

@@ -1,14 +1,14 @@
 [Desktop Entry]
 Categories=System;Monitor;
-Comment[es_MX]=Universal System Monitor (TTY + GUI)
-Comment=Universal System Monitor (TTY + GUI)
+Comment[es_MX]=Monitor universal del sistema (TTY + GUI)
+Comment=Universal system monitor (TTY + GUI)
 Exec=pulse
 GenericName[es_MX]=
 GenericName=
 Icon=pulse
 MimeType=
-Name[es_MX]=Pulse Monitor
-Name=Pulse Monitor
+Name[es_MX]=Pulse-Active
+Name=Pulse-Active
 NoDisplay=false
 Path=
 PrefersNonDefaultGPU=false

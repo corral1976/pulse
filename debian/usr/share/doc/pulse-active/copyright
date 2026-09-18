@@ -1,5 +1,5 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: pulse-monitor
+Upstream-Name: pulse-active
 Upstream-Contact: Carlos Corral <corral1976@gmail.com>
 Source: https://gitlab.com/corral1976/pulse
 

@@ -2,7 +2,7 @@
 
 set -e
 
-PACKAGE_NAME="pulse-monitor"
+PACKAGE_NAME="pulse-active"
 VERSION="1.0.0"
 ARCHITECTURE="all"
 DEBIAN_DIR="debian"

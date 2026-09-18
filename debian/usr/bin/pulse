@@ -58,7 +58,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [ "$SHOW_HELP" = true ]; then
-    echo "Pulse v${SCRIPT_VERSION} - System Monitor"
+    echo "Pulse-Active v${SCRIPT_VERSION}"
     echo "Usage: pulse [OPTIONS]"
     echo ""
     echo "Options:"
@@ -75,7 +75,7 @@ if [ "$SHOW_HELP" = true ]; then
 fi
 
 if [ "$SHOW_VERSION" = true ]; then
-    echo "Pulse v${SCRIPT_VERSION} - Universal Edition (TTY + GUI)"
+    echo "Pulse-Active v${SCRIPT_VERSION} - Universal Edition (TTY + GUI)"
     echo "Created by Carlos Corral | Pulse Active | 2026"
     exit 0
 fi
@@ -672,7 +672,7 @@ if [ "$TERM_TYPE" = "gui" ]; then
 else
     
     printf "╔════════════════════════════════════════════════════════════════╗\n"
-    printf "║                    PULSE - System Monitor (TTY Mode)           ║\n"
+    printf "║                    PULSE-ACTIVE (TTY Mode)                     ║\n"
     printf "║                    Universal Edition v%-25s║\n" "${SCRIPT_VERSION}"
     printf "╚════════════════════════════════════════════════════════════════╝\n\n"
     
@@ -712,7 +712,7 @@ else
     printf "  Net: Down:%7skb │ Up:%7skb │ History: %-18s\n" "$(printf "%7s" "$DL")" "$(printf "%7s" "$UL")" "$(draw_graph)"
     printf "\n"
     
-    printf "PULSE ACTIVE v%s - Universal System Monitor - TTY Mode - Carlos Corral 2026\n" "${SCRIPT_VERSION}"
+    printf "Pulse-Active v%s - Universal Monitor - TTY Mode - Carlos Corral 2026\n" "${SCRIPT_VERSION}"
     printf "GitLab: https://gitlab.com/corral1976/pulse\n"
     printf "Support: https://ko-fi.com/retrolcdclock\n"
 fi

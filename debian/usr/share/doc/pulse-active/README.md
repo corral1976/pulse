@@ -1,4 +1,4 @@
-# Pulse - System Monitor v1.0.0
+# Pulse-Active v1.0.0
 
 Real-time monitoring of CPU, RAM, disk, network, and temperatures in your terminal.
 
@@ -6,7 +6,7 @@ Real-time monitoring of CPU, RAM, disk, network, and temperatures in your termin
 
 ### Debian/Ubuntu (.deb package)
 ```bash
-sudo dpkg -i pulse-monitor_1.0.0_all.deb
+sudo dpkg -i pulse-active_1.0.0_all.deb
 ```
 
 ### Manual installation

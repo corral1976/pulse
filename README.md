@@ -1,4 +1,4 @@
-# Pulse - System Monitor v1.0.0
+# Pulse-Active v1.0.0
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Latest Release](https://img.shields.io/gitlab/v/release/corral1976/pulse)](https://gitlab.com/corral1976/pulse/-/releases)
@@ -22,7 +22,7 @@ A minimalist and elegant system monitor for the terminal, designed for advanced 
 ### Debian/Ubuntu (.deb package)
 
 ```bash
-sudo dpkg -i pulse-monitor_1.0.0_all.deb
+sudo dpkg -i pulse-active_1.0.0_all.deb
 ```
 
 ### Build from source
@@ -36,7 +36,7 @@ cd pulse
 bash BUILD_DEB.sh
 
 # Install
-sudo dpkg -i pulse-monitor_1.0.0_all.deb
+sudo dpkg -i pulse-active_1.0.0_all.deb
 ```
 
 ## Usage
@@ -99,7 +99,7 @@ sudo sensors-detect
 ## Removal
 
 ```bash
-sudo dpkg -r pulse-monitor
+sudo dpkg -r pulse-active
 ```
 
 ## License
