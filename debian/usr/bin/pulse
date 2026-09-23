@@ -80,10 +80,39 @@ if [ "$SHOW_VERSION" = true ]; then
     exit 0
 fi
 
+check_dependencies() {
+    # Comandos sin los cuales Pulse no puede funcionar en absoluto
+    local required=(awk grep sed cut df date stat hostname uname stty)
+    # Comandos que habilitan funciones extra (temperatura, batería, GPU...)
+    # pero cuya ausencia ya se maneja con gracia en el resto del script.
+    local optional=(sensors lspci glxinfo upower nvidia-smi xdpyinfo uptime xargs pgrep ps)
+    local missing_required=()
+    local missing_optional=()
+    local dep
+
+    for dep in "${required[@]}"; do
+        command -v "$dep" >/dev/null 2>&1 || missing_required+=("$dep")
+    done
+    for dep in "${optional[@]}"; do
+        command -v "$dep" >/dev/null 2>&1 || missing_optional+=("$dep")
+    done
+
+    if [ "${#missing_required[@]}" -gt 0 ]; then
+        echo "Error: faltan comandos esenciales: ${missing_required[*]}" >&2
+        exit 1
+    fi
+
+    if [ "${#missing_optional[@]}" -gt 0 ] && [ "$QUIET_MODE" = false ]; then
+        echo "Nota: funciones opcionales reducidas (no instalado: ${missing_optional[*]})" >&2
+    fi
+}
+
+check_dependencies
+
 detect_terminal() {
     local term_type="unknown"
     
-    if [ -n "${WAYLAND_DISPLAY:-}" ] || [ -n "${XDG_SESSION_TYPE:-}" ] && [ "$XDG_SESSION_TYPE" = "wayland" ]; then
+    if [ -n "${WAYLAND_DISPLAY:-}" ] || { [ -n "${XDG_SESSION_TYPE:-}" ] && [ "$XDG_SESSION_TYPE" = "wayland" ]; }; then
         term_type="gui"
     elif [ -n "${DISPLAY:-}" ] && command -v xdpyinfo >/dev/null 2>&1; then
         term_type="gui"
@@ -214,33 +243,6 @@ get_package_count() {
     fi
     
     echo "$pkg_count"
-}
-
-check_dependencies() {
-    # Comandos sin los cuales Pulse no puede funcionar en absoluto
-    local required=(awk grep sed cut df date stat hostname uname stty)
-    # Comandos que habilitan funciones extra (temperatura, batería, GPU...)
-    # pero cuya ausencia ya se maneja con gracia en el resto del script.
-    local optional=(sensors lspci glxinfo upower nvidia-smi xdpyinfo uptime xargs pgrep ps)
-    local missing_required=()
-    local missing_optional=()
-    local dep
-
-    for dep in "${required[@]}"; do
-        command -v "$dep" >/dev/null 2>&1 || missing_required+=("$dep")
-    done
-    for dep in "${optional[@]}"; do
-        command -v "$dep" >/dev/null 2>&1 || missing_optional+=("$dep")
-    done
-
-    if [ "${#missing_required[@]}" -gt 0 ]; then
-        echo "Error: faltan comandos esenciales: ${missing_required[*]}" >&2
-        exit 1
-    fi
-
-    if [ "${#missing_optional[@]}" -gt 0 ] && [ "$QUIET_MODE" = false ]; then
-        echo "Nota: funciones opcionales reducidas (no instalado: ${missing_optional[*]})" >&2
-    fi
 }
 
 detect_wm() {
@@ -412,11 +414,32 @@ get_battery_info() {
     echo "${battery_info:-No Battery}"
 }
 
+# Trunca "$1" a un máximo de "$2" caracteres cortando en el último espacio
+# dentro de ese límite, para no partir una palabra a la mitad. Si no hay
+# ningún espacio dentro del límite (una sola palabra larga), se cae de
+# vuelta al corte duro original.
+truncate_at_word() {
+    local str="$1"
+    local max="$2"
+    local cut
+
+    if [ "${#str}" -le "$max" ]; then
+        echo "$str"
+        return
+    fi
+
+    cut="${str:0:$max}"
+    if [[ "$cut" == *" "* ]]; then
+        cut="${cut% *}"
+    fi
+    echo "$cut"
+}
+
 PREV_T=0; PREV_I=0; PREV_RX=0; PREV_TX=0; TICK=0
 CPU_HISTORY=(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)
 CPU_M=$(awk -F: '/model name/ {print $2; exit}' /proc/cpuinfo 2>/dev/null | sed -e 's/^[ \t]*//;s/ with.*//')
 CPU_M="${CPU_M:-Unknown CPU}"
-CPU_M="${CPU_M:0:35}"
+CPU_M="$(truncate_at_word "$CPU_M" 35)"
 
 SENSORS_CACHE=""
 SENSORS_CACHE_TIME=0
@@ -432,7 +455,7 @@ BATTERY_CACHE_TTL=10  # La batería cambia aún más lento
 GPU_M=$(glxinfo -B 2>/dev/null | grep -m1 "Device" | cut -d: -f2 | sed 's/^[ \t]*//;s/(.*//')
 [ -z "$GPU_M" ] && GPU_M=$(lspci 2>/dev/null | grep -iE 'vga|3d|display' | cut -d: -f3 | sed 's/^[ \t]*//;s/\[.*\]//;s/(rev.*//' | head -n1)
 GPU_M="${GPU_M:-Unknown GPU}"
-GPU_M="${GPU_M:0:35}"
+GPU_M="$(truncate_at_word "$GPU_M" 35)"
 
 get_disk_info_cached() {
     local current_time
@@ -552,8 +575,6 @@ safe_div() {
     local denominator=$2
     [ "$denominator" -eq 0 ] && echo "0" || echo $(( numerator * 100 / denominator ))
 }
-
-check_dependencies
 
 while true; do
     if ! read -r _ u n s i w x y z _ < /proc/stat 2>/dev/null; then
