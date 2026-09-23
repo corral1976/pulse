@@ -80,15 +80,42 @@ if [ "$SHOW_VERSION" = true ]; then
     exit 0
 fi
 
+# Detecta el fabricante de la GPU vía lspci (mismo método que usa GPU_M más
+# abajo en el script). Si lspci no está disponible, devuelve "unknown": en
+# ese caso preferimos NO advertir sobre nvidia-smi en vez de arriesgarnos a
+# un falso positivo en hardware que no es NVIDIA.
+detect_gpu_vendor() {
+    local pci_line=""
+    if command -v lspci >/dev/null 2>&1; then
+        pci_line=$(lspci 2>/dev/null | grep -iE 'vga|3d|display')
+    fi
+    if echo "$pci_line" | grep -qi 'nvidia'; then
+        echo "nvidia"
+    elif echo "$pci_line" | grep -qiE '\bamd\b|\bati\b|radeon'; then
+        echo "amd"
+    elif echo "$pci_line" | grep -qi 'intel'; then
+        echo "intel"
+    else
+        echo "unknown"
+    fi
+}
+
 check_dependencies() {
     # Comandos sin los cuales Pulse no puede funcionar en absoluto
     local required=(awk grep sed cut df date stat hostname uname stty)
     # Comandos que habilitan funciones extra (temperatura, batería, GPU...)
     # pero cuya ausencia ya se maneja con gracia en el resto del script.
-    local optional=(sensors lspci glxinfo upower nvidia-smi xdpyinfo uptime xargs pgrep ps)
+    # nvidia-smi solo se agrega a la lista si se detecta una GPU NVIDIA:
+    # así un usuario con Radeon/Intel no recibe advertencias sobre una
+    # herramienta que nunca le va a aplicar.
+    local optional=(sensors lspci glxinfo upower xdpyinfo uptime xargs pgrep ps)
     local missing_required=()
     local missing_optional=()
     local dep
+
+    if [ "$(detect_gpu_vendor)" = "nvidia" ]; then
+        optional+=(nvidia-smi)
+    fi
 
     for dep in "${required[@]}"; do
         command -v "$dep" >/dev/null 2>&1 || missing_required+=("$dep")
