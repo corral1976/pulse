@@ -4,7 +4,7 @@ Architecture: all
 Installed-Size: 108
 Maintainer: Carlos Corral <corral1976@gmail.com>
 Depends: bash (>= 4.0)
-Recommends: lm-sensors, mesa-utils, pciutils, upower, x11-utils, procps
+Recommends: lm-sensors, nvidia-utils, mesa-utils, pciutils, upower, x11-utils, procps
 Homepage: https://gitlab.com/corral1976/pulse
 Description: A minimalist and elegant system monitor for the terminal
  Pulse-Active is a real-time system monitor featuring:
