@@ -603,23 +603,17 @@ safe_div() {
     [ "$denominator" -eq 0 ] && echo "0" || echo $(( numerator * 100 / denominator ))
 }
 
-# Intro estilo demoscene: revela el logo ASCII línea por línea antes de
-# entrar al dashboard. Se salta por completo en modo --quiet (no debe
-# alterar la salida de scripts/dashboards que parsean pulse -q), y es
-# saltable en cualquier momento con una sola tecla, usando el mismo patrón
-# read -t ... -n 1 que ya usa el loop principal para su salida.
-# Intro estilo demoscene: tipea carácter por carácter el logo ASCII y toda
-# la información estática que se muestra junto a él (usuario, distro,
-# kernel, etc. — los mismos datos que ya se calcularon una sola vez más
-# arriba, antes del loop). Las barras de CPU/RAM/disco, el gráfico de
-# historial, red y temperaturas NO se tipean aquí: son genuinamente en vivo
-# (se recalculan en cada vuelta del loop) y aparecen de golpe apenas arranca
-# el dashboard real, tal como ya ocurría antes de este intro.
+# Intro estilo demoscene: tipea carácter por carácter el ascii-art (el
+# corazón) y la información estática de al lado (usuario, distro, kernel,
+# etc. — los mismos datos ya calculados antes del loop). Las barras de
+# CPU/RAM/disco, el gráfico de historial, red y temperaturas no se tipean
+# acá: son en vivo, se recalculan en cada vuelta del loop y aparecen de
+# golpe apenas arranca el dashboard real.
 #
 # Se salta por completo en modo --quiet (no debe alterar la salida de
-# scripts/dashboards que parsean pulse -q), y es saltable en cualquier
-# momento con una sola tecla: el patrón read -t ... -n 1 es el mismo que ya
-# usa el loop principal para su propia salida.
+# scripts que parsean pulse -q), y es saltable en cualquier momento con
+# una sola tecla, con el mismo patrón read -t ... -n 1 que usa el loop
+# principal para su propia salida.
 play_intro() {
     [ "$QUIET_MODE" = true ] && return
 
@@ -651,17 +645,20 @@ play_intro() {
         printf "\e[H\e[J\n"
 
         # Captura el texto plano reutilizando EXACTAMENTE los mismos printf
-        # del dashboard real (líneas ~740-762 más abajo en este archivo),
-        # con los colores anulados solo para esta captura. Así el
-        # espaciado queda garantizado idéntico al original, sin
-        # transcribirlo a mano.
+        # del dashboard real, más abajo en este archivo, con los colores
+        # anulados solo para esta captura. Así el espaciado queda
+        # garantizado idéntico al original, sin transcribirlo a mano.
         #
         # ${C:-} en vez de ${C}: C solo se asigna dentro del loop principal
-        # (para el efecto arcoíris del arte por cada "tick"), así que antes
-        # de que el loop arranque todavía no existe. Con `set -u` activo,
-        # referenciarla sin este valor por defecto aborta el script
-        # completo con "unbound variable" — por eso no se veía nada en
-        # modo GUI.
+        # (ahí es donde rota el color en cada "tick" para el efecto
+        # arcoíris del dashboard en vivo), así que antes de que el loop
+        # arranque todavía no existe. Con `set -u` activo, referenciarla
+        # sin este valor por defecto aborta el script con "unbound
+        # variable" — por eso no se veía nada en modo GUI. Durante el
+        # intro no queremos ese arcoíris de todos modos: el ascii-art se
+        # tipea en el mismo crema (COL_WHITE) de la línea de la hora (ver
+        # las llamadas a _intro_type_line más abajo), no con el color que
+        # rota.
         local C_bak="${C:-}" RESET_bak="$RESET" COL_DIM_bak="$COL_DIM" COL_WHITE_bak="$COL_WHITE"
         local COL_G1_bak="$COL_G1" COL_G2_bak="$COL_G2" COL_G3_bak="$COL_G3" COL_G4_bak="$COL_G4"
         C=""; RESET=""; COL_DIM=""; COL_WHITE=""; COL_G1=""; COL_G2=""; COL_G3=""; COL_G4=""
@@ -691,15 +688,15 @@ play_intro() {
         C="$C_bak"; RESET="$RESET_bak"; COL_DIM="$COL_DIM_bak"; COL_WHITE="$COL_WHITE_bak"
         COL_G1="$COL_G1_bak"; COL_G2="$COL_G2_bak"; COL_G3="$COL_G3_bak"; COL_G4="$COL_G4_bak"
 
-        _intro_type_line "$l01" "$COL_G1"
-        _intro_type_line "$l02" "$COL_G1"
-        _intro_type_line "$l03" "$COL_G1"
-        _intro_type_line "$l04" "$COL_G2"
-        _intro_type_line "$l05" "$COL_G2"
-        _intro_type_line "$l06" "$COL_G2"
-        _intro_type_line "$l07" "$COL_G3"
-        _intro_type_line "$l08" "$COL_G3"
-        _intro_type_line "$l09" "$COL_G3"
+        _intro_type_line "$l01" "$COL_WHITE"
+        _intro_type_line "$l02" "$COL_WHITE"
+        _intro_type_line "$l03" "$COL_WHITE"
+        _intro_type_line "$l04" "$COL_WHITE"
+        _intro_type_line "$l05" "$COL_WHITE"
+        _intro_type_line "$l06" "$COL_WHITE"
+        _intro_type_line "$l07" "$COL_WHITE"
+        _intro_type_line "$l08" "$COL_WHITE"
+        _intro_type_line "$l09" "$COL_WHITE"
         _intro_type_line "$l10" "$COL_G4"
         _intro_type_line "$l11" "$COL_G4"
         _intro_type_line "$l12" "$COL_G4"
@@ -707,7 +704,7 @@ play_intro() {
         clear
 
         # Igual que en GUI: reutiliza los printf literales del bloque TTY
-        # real (líneas ~791-815 más abajo) para garantizar el mismo
+        # real, más abajo en este archivo, para garantizar el mismo
         # espaciado exacto, sin transcribir nada a mano.
         local -a ttylines=()
         ttylines+=("$(printf "╔════════════════════════════════════════════════════════════════╗")")
