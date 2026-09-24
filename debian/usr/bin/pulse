@@ -603,6 +603,155 @@ safe_div() {
     [ "$denominator" -eq 0 ] && echo "0" || echo $(( numerator * 100 / denominator ))
 }
 
+# Intro estilo demoscene: revela el logo ASCII línea por línea antes de
+# entrar al dashboard. Se salta por completo en modo --quiet (no debe
+# alterar la salida de scripts/dashboards que parsean pulse -q), y es
+# saltable en cualquier momento con una sola tecla, usando el mismo patrón
+# read -t ... -n 1 que ya usa el loop principal para su salida.
+# Intro estilo demoscene: tipea carácter por carácter el logo ASCII y toda
+# la información estática que se muestra junto a él (usuario, distro,
+# kernel, etc. — los mismos datos que ya se calcularon una sola vez más
+# arriba, antes del loop). Las barras de CPU/RAM/disco, el gráfico de
+# historial, red y temperaturas NO se tipean aquí: son genuinamente en vivo
+# (se recalculan en cada vuelta del loop) y aparecen de golpe apenas arranca
+# el dashboard real, tal como ya ocurría antes de este intro.
+#
+# Se salta por completo en modo --quiet (no debe alterar la salida de
+# scripts/dashboards que parsean pulse -q), y es saltable en cualquier
+# momento con una sola tecla: el patrón read -t ... -n 1 es el mismo que ya
+# usa el loop principal para su propia salida.
+play_intro() {
+    [ "$QUIET_MODE" = true ] && return
+
+    local skip=false
+    local now_ts
+    now_ts=$(date +'%H:%M:%S')
+
+    # Tipea "$1" (texto plano, sin códigos de color) carácter por carácter,
+    # envuelto en el color "$2" si no viene vacío. En cuanto se detecta una
+    # tecla, "skip" queda en true y el resto de esta línea (y de las
+    # siguientes) se imprime de un tirón, sin más pausas.
+    _intro_type_line() {
+        local text="$1" color="${2:-}" i char
+        [ -n "$color" ] && printf "%s" "$color"
+        if [ "$skip" = true ]; then
+            printf "%s" "$text"
+        else
+            for (( i = 0; i < ${#text}; i++ )); do
+                char="${text:i:1}"
+                printf "%s" "$char"
+                read -r -t 0.004 -n 1 _ 2>/dev/null && skip=true
+            done
+        fi
+        [ -n "$color" ] && printf "%s" "$RESET"
+        printf "\n"
+    }
+
+    if [ "$TERM_TYPE" = "gui" ]; then
+        printf "\e[H\e[J\n"
+
+        # Captura el texto plano reutilizando EXACTAMENTE los mismos printf
+        # del dashboard real (líneas ~740-762 más abajo en este archivo),
+        # con los colores anulados solo para esta captura. Así el
+        # espaciado queda garantizado idéntico al original, sin
+        # transcribirlo a mano.
+        #
+        # ${C:-} en vez de ${C}: C solo se asigna dentro del loop principal
+        # (para el efecto arcoíris del arte por cada "tick"), así que antes
+        # de que el loop arranque todavía no existe. Con `set -u` activo,
+        # referenciarla sin este valor por defecto aborta el script
+        # completo con "unbound variable" — por eso no se veía nada en
+        # modo GUI.
+        local C_bak="${C:-}" RESET_bak="$RESET" COL_DIM_bak="$COL_DIM" COL_WHITE_bak="$COL_WHITE"
+        local COL_G1_bak="$COL_G1" COL_G2_bak="$COL_G2" COL_G3_bak="$COL_G3" COL_G4_bak="$COL_G4"
+        C=""; RESET=""; COL_DIM=""; COL_WHITE=""; COL_G1=""; COL_G2=""; COL_G3=""; COL_G4=""
+
+        # DISK_P (igual que C) solo se calcula dentro del loop principal;
+        # se toma aquí una muestra puntual con la misma función que usa el
+        # loop, para poder mostrarla en el frame tipeado sin depender de
+        # una variable que todavía no existe.
+        local disk_used_snap disk_total_snap disk_p_now
+        read -r disk_used_snap disk_total_snap disk_p_now < <(get_disk_info "$DISK_PATH")
+        disk_p_now="${disk_p_now:-0}"
+
+        local l01 l02 l03 l04 l05 l06 l07 l08 l09 l10 l11 l12
+        l01=$(printf "      ${C} .MMM.   .MMM.  ${RESET}    ${COL_G1}> user    ${COL_DIM}│ ${RESET}%s" "$USER")
+        l02=$(printf "      ${C}.MMMMMM.MMMMMM. ${RESET}    ${COL_G1}> uptime  ${COL_DIM}│ ${RESET}%s" "$UPTIME")
+        l03=$(printf "      ${C}MMMMMMMMMMMMMMM ${RESET}    ${COL_G1}> display ${COL_DIM}│ ${RESET}%s" "$RES")
+        l04=$(printf "      ${C}MMMMMMMMMMMMMMM ${RESET}    ${COL_G2}> distro  ${COL_DIM}│ ${RESET}%s" "$OS")
+        l05=$(printf "      ${C}'MMMMMMMMMMMMM' ${RESET}    ${COL_G2}> kernel  ${COL_DIM}│ ${RESET}%s" "$KERNEL")
+        l06=$(printf "      ${C}  'MMMMMMMMM'   ${RESET}    ${COL_G2}> wm      ${COL_DIM}│ ${RESET}%s" "$WM")
+        l07=$(printf "      ${C}    'MMMMM'     ${RESET}    ${COL_G3}> desktop ${COL_DIM}│ ${RESET}%s" "$DE")
+        l08=$(printf "      ${C}      'M'       ${RESET}    ${COL_G3}> term    ${COL_DIM}│ ${RESET}%s" "$TERM_N")
+        l09=$(printf "      ${C}  PULSE-ACTIVE  ${RESET}    ${COL_G3}> shell   ${COL_DIM}│ ${RESET}%s" "$SHELL_V")
+        l10=$(printf "      ${COL_WHITE}   [%s]${RESET}       ${COL_G4}> apps    ${COL_DIM}│ ${RESET}%s" "$now_ts" "$PKGS")
+        l11=$(printf "      ${COL_DIM}----------------${RESET}    ${COL_G4}> disk    ${COL_DIM}│ ${RESET}%s%%" "$disk_p_now")
+        l12=$(printf "                        ${COL_G4}  > OS Age  ${COL_DIM}│ ${RESET}%s" "$OS_AGE")
+
+        C="$C_bak"; RESET="$RESET_bak"; COL_DIM="$COL_DIM_bak"; COL_WHITE="$COL_WHITE_bak"
+        COL_G1="$COL_G1_bak"; COL_G2="$COL_G2_bak"; COL_G3="$COL_G3_bak"; COL_G4="$COL_G4_bak"
+
+        _intro_type_line "$l01" "$COL_G1"
+        _intro_type_line "$l02" "$COL_G1"
+        _intro_type_line "$l03" "$COL_G1"
+        _intro_type_line "$l04" "$COL_G2"
+        _intro_type_line "$l05" "$COL_G2"
+        _intro_type_line "$l06" "$COL_G2"
+        _intro_type_line "$l07" "$COL_G3"
+        _intro_type_line "$l08" "$COL_G3"
+        _intro_type_line "$l09" "$COL_G3"
+        _intro_type_line "$l10" "$COL_G4"
+        _intro_type_line "$l11" "$COL_G4"
+        _intro_type_line "$l12" "$COL_G4"
+    else
+        clear
+
+        # Igual que en GUI: reutiliza los printf literales del bloque TTY
+        # real (líneas ~791-815 más abajo) para garantizar el mismo
+        # espaciado exacto, sin transcribir nada a mano.
+        local -a ttylines=()
+        ttylines+=("$(printf "╔════════════════════════════════════════════════════════════════╗")")
+        ttylines+=("$(printf "║                    PULSE-ACTIVE (TTY Mode)                     ║")")
+        ttylines+=("$(printf "║                    Universal Edition v%-25s║" "${SCRIPT_VERSION}")")
+        ttylines+=("$(printf "╚════════════════════════════════════════════════════════════════╝")")
+        ttylines+=("")
+        ttylines+=("$(printf "       .MMM.   .MMM.  ")")
+        ttylines+=("$(printf "     .MMMMMM.MMMMMMM. ")")
+        ttylines+=("$(printf "      MMMMMMMMMMMMMMM ")")
+        ttylines+=("$(printf "      MMMMMMMMMMMMMMM ")")
+        ttylines+=("$(printf "      'MMMMMMMMMMMMM' ")")
+        ttylines+=("$(printf "        'MMMMMMMMM'   ")")
+        ttylines+=("$(printf "          'MMMMM'     ")")
+        ttylines+=("$(printf "            'M'       ")")
+        ttylines+=("$(printf "        PULSE-ACTIVE  ")")
+        ttylines+=("$(printf "         [%s]" "$now_ts")")
+        ttylines+=("")
+        ttylines+=("$(printf "SYSTEM INFO:")")
+        ttylines+=("$(printf "  User: %s" "${USER}")")
+        ttylines+=("$(printf "  Time: %s" "$(date +'%H:%M')")")
+        ttylines+=("$(printf "  Shell: %s" "${SHELL_V##*/}")")
+        ttylines+=("$(printf "  Host: %s" "$(hostname)")")
+        ttylines+=("$(printf "  Uptime: %s" "${UPTIME}")")
+        ttylines+=("$(printf "  Kernel: %s" "${KERNEL}")")
+        ttylines+=("$(printf "  OS: %s" "${OS}")")
+        ttylines+=("$(printf "  Apps: %s" "${PKGS}")")
+        ttylines+=("$(printf "  OS Age: %s" "${OS_AGE}")")
+
+        local tline
+        for tline in "${ttylines[@]}"; do
+            _intro_type_line "$tline" ""
+        done
+    fi
+
+    # Pausa final breve para que el frame completo "respire" antes de
+    # entrar al dashboard en vivo; también saltable.
+    [ "$skip" = false ] && read -r -t 0.5 -n 1 _ 2>/dev/null
+
+    unset -f _intro_type_line
+}
+
+play_intro
+
 while true; do
     if ! read -r _ u n s i w x y z _ < /proc/stat 2>/dev/null; then
         sleep "$REFRESH_INTERVAL"
