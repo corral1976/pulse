@@ -367,21 +367,34 @@ SHELL_V="$SHELL $(echo "$BASH_VERSION" | cut -d'(' -f1)"
 PKGS="$(get_package_count)"
 OS_AGE="$(get_os_age)"
 
+# Shared cache used by get_cpu_temp/get_gpu_temp so `sensors` runs at most
+# once per CACHE_TTL window instead of once per caller.
+get_sensors_cached() {
+    local current_time
+    current_time=$(date +%s)
+    if [ -z "$SENSORS_CACHE" ] || [ $((current_time - SENSORS_CACHE_TIME)) -ge "$CACHE_TTL" ]; then
+        SENSORS_CACHE=$(sensors 2>/dev/null)
+        SENSORS_CACHE_TIME=$current_time
+    fi
+    echo "$SENSORS_CACHE"
+}
+
+get_nvidia_temp_cached() {
+    local current_time
+    current_time=$(date +%s)
+    if [ -z "$NVIDIA_CACHE" ] || [ $((current_time - NVIDIA_CACHE_TIME)) -ge "$CACHE_TTL" ]; then
+        NVIDIA_CACHE=$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits 2>/dev/null)
+        NVIDIA_CACHE_TIME=$current_time
+    fi
+    echo "$NVIDIA_CACHE"
+}
+
 get_cpu_temp() {
     local temp=""
     local sensors_output
-    local current_time
-    
+
     if command -v sensors >/dev/null 2>&1; then
-        current_time=$(date +%s)
-        if [ -n "$SENSORS_CACHE" ] && [ $((current_time - SENSORS_CACHE_TIME)) -lt $CACHE_TTL ]; then
-            sensors_output="$SENSORS_CACHE"
-        else
-            sensors_output=$(sensors 2>/dev/null)
-            SENSORS_CACHE="$sensors_output"
-            SENSORS_CACHE_TIME=$current_time
-        fi
-        
+        sensors_output=$(get_sensors_cached)
         temp=$(echo "$sensors_output" | grep -E 'Tctl|Core 0|Package id|CPUTIN' | head -1 | grep -o '[+-][0-9]\+\.[0-9]\+' | head -1)
         [ -z "$temp" ] && temp=$(echo "$sensors_output" | grep 'k10temp' -A 3 | grep -o '[+-][0-9]\+\.[0-9]\+' | head -1)
     elif [ -f /sys/class/thermal/thermal_zone0/temp ]; then
@@ -394,28 +407,12 @@ get_gpu_temp() {
     local temp=""
     local sensors_output
     local nvidia_output
-    local current_time
-    
+
     if command -v sensors >/dev/null 2>&1; then
-        current_time=$(date +%s)
-        if [ -n "$SENSORS_CACHE" ] && [ $((current_time - SENSORS_CACHE_TIME)) -lt $CACHE_TTL ]; then
-            sensors_output="$SENSORS_CACHE"
-        else
-            sensors_output=$(sensors 2>/dev/null)
-            SENSORS_CACHE="$sensors_output"
-            SENSORS_CACHE_TIME=$current_time
-        fi
-        
+        sensors_output=$(get_sensors_cached)
         temp=$(echo "$sensors_output" | grep -A 5 'amdgpu' | grep 'edge' | grep -o '[+-][0-9]\+\.[0-9]\+' | head -1)
         if [ -z "$temp" ] && command -v nvidia-smi >/dev/null 2>&1; then
-            current_time=$(date +%s)
-            if [ -n "$NVIDIA_CACHE" ] && [ $((current_time - NVIDIA_CACHE_TIME)) -lt $CACHE_TTL ]; then
-                nvidia_output="$NVIDIA_CACHE"
-            else
-                nvidia_output=$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits 2>/dev/null)
-                NVIDIA_CACHE="$nvidia_output"
-                NVIDIA_CACHE_TIME=$current_time
-            fi
+            nvidia_output=$(get_nvidia_temp_cached)
             [ -n "$nvidia_output" ] && temp="$nvidia_output"
         fi
         [ -z "$temp" ] && temp=$(echo "$sensors_output" | grep -A 3 'nvme' | grep 'Composite' | grep -o '[+-][0-9]\+\.[0-9]\+' | head -1)
@@ -446,10 +443,7 @@ get_battery_info() {
     echo "${battery_info:-No Battery}"
 }
 
-# Trunca "$1" a un máximo de "$2" caracteres cortando en el último espacio
-# dentro de ese límite, para no partir una palabra a la mitad. Si no hay
-# ningún espacio dentro del límite (una sola palabra larga), se cae de
-# vuelta al corte duro original.
+# Trunca "$1" a "$2" caracteres, cortando en el último espacio para no partir una palabra.
 truncate_at_word() {
     local str="$1"
     local max="$2"
@@ -467,7 +461,7 @@ truncate_at_word() {
     echo "$cut"
 }
 
-PREV_T=0; PREV_I=0; PREV_RX=0; PREV_TX=0; TICK=0
+PREV_T=0; PREV_I=0; PREV_RX=0; PREV_TX=0
 CPU_HISTORY=(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)
 CPU_M=$(awk -F: '/model name/ {print $2; exit}' /proc/cpuinfo 2>/dev/null | sed -e 's/^[ \t]*//;s/ with.*//')
 CPU_M="${CPU_M:-Unknown CPU}"
@@ -543,10 +537,8 @@ draw_bar() {
             bar_char="|"
         fi
         
-        # shellcheck disable=SC2059
-        for ((i=0; i<fill; i++)); do printf "$bar_char"; done
-        # shellcheck disable=SC2059
-        for ((i=fill; i<len; i++)); do printf "$empty_char"; done
+        for ((i=0; i<fill; i++)); do printf "%s" "$bar_char"; done
+        for ((i=fill; i<len; i++)); do printf "%s" "$empty_char"; done
         printf " [%d%%]" "$pct"
     fi
 }
@@ -606,17 +598,10 @@ safe_div() {
     [ "$denominator" -eq 0 ] && echo "0" || echo $(( numerator * 100 / denominator ))
 }
 
-# Intro estilo demoscene: tipea carácter por carácter el ascii-art (el
-# corazón) y la información estática de al lado (usuario, distro, kernel,
-# etc. — los mismos datos ya calculados antes del loop). Las barras de
-# CPU/RAM/disco, el gráfico de historial, red y temperaturas no se tipean
-# acá: son en vivo, se recalculan en cada vuelta del loop y aparecen de
-# golpe apenas arranca el dashboard real.
-#
-# Se salta por completo en modo --quiet (no debe alterar la salida de
-# scripts que parsean pulse -q), y es saltable en cualquier momento con
-# una sola tecla, con el mismo patrón read -t ... -n 1 que usa el loop
-# principal para su propia salida.
+# Intro estilo demoscene: tipea el ascii-art y los datos estáticos (usuario,
+# distro, kernel...) carácter por carácter. Las métricas en vivo se muestran
+# de golpe al arrancar el dashboard real, no acá. Se salta en modo --quiet y
+# es saltable en cualquier momento con una tecla.
 play_intro() {
     [ "$QUIET_MODE" = true ] && return
 
@@ -647,29 +632,15 @@ play_intro() {
     if [ "$TERM_TYPE" = "gui" ]; then
         printf "\e[H\e[J\n"
 
-        # Captura el texto plano reutilizando EXACTAMENTE los mismos printf
-        # del dashboard real, más abajo en este archivo, con los colores
-        # anulados solo para esta captura. Así el espaciado queda
-        # garantizado idéntico al original, sin transcribirlo a mano.
-        #
-        # ${C:-} en vez de ${C}: C solo se asigna dentro del loop principal
-        # (ahí es donde rota el color en cada "tick" para el efecto
-        # arcoíris del dashboard en vivo), así que antes de que el loop
-        # arranque todavía no existe. Con `set -u` activo, referenciarla
-        # sin este valor por defecto aborta el script con "unbound
-        # variable" — por eso no se veía nada en modo GUI. Durante el
-        # intro no queremos ese arcoíris de todos modos: el ascii-art se
-        # tipea en el mismo crema (COL_WHITE) de la línea de la hora (ver
-        # las llamadas a _intro_type_line más abajo), no con el color que
-        # rota.
+        # Reutiliza los mismos printf del dashboard real (más abajo), con los
+        # colores anulados, para que el espaciado quede idéntico sin transcribir
+        # nada a mano. ${C:-} porque C recién se asigna dentro del loop principal;
+        # con `set -u` activo, referenciarla antes abortaría el script.
         local C_bak="${C:-}" RESET_bak="$RESET" COL_DIM_bak="$COL_DIM" COL_WHITE_bak="$COL_WHITE"
         local COL_G1_bak="$COL_G1" COL_G2_bak="$COL_G2" COL_G3_bak="$COL_G3" COL_G4_bak="$COL_G4"
         C=""; RESET=""; COL_DIM=""; COL_WHITE=""; COL_G1=""; COL_G2=""; COL_G3=""; COL_G4=""
 
-        # DISK_P (igual que C) solo se calcula dentro del loop principal;
-        # se toma aquí una muestra puntual con la misma función que usa el
-        # loop, para poder mostrarla en el frame tipeado sin depender de
-        # una variable que todavía no existe.
+        # DISK_P tampoco existe todavía; se toma una muestra puntual para el frame tipeado.
         local disk_used_snap disk_total_snap disk_p_now
         read -r disk_used_snap disk_total_snap disk_p_now < <(get_disk_info "$DISK_PATH")
         disk_p_now="${disk_p_now:-0}"
@@ -706,9 +677,7 @@ play_intro() {
     else
         clear
 
-        # Igual que en GUI: reutiliza los printf literales del bloque TTY
-        # real, más abajo en este archivo, para garantizar el mismo
-        # espaciado exacto, sin transcribir nada a mano.
+        # Igual que en GUI: reutiliza los printf literales del bloque TTY real (más abajo).
         local -a ttylines=()
         ttylines+=("$(printf "╔════════════════════════════════════════════════════════════════╗")")
         ttylines+=("$(printf "║                    PULSE-ACTIVE (TTY Mode)                     ║")")
@@ -769,56 +738,36 @@ draw_dashboard_gui() {
         h7="    ':::::'     "; h8="      ':'       "
     fi
 
+    local now_hms
+    now_hms=$(date +'%H:%M:%S')
+
     printf "\e[H\e[J\n"
-    # shellcheck disable=SC2059
-    printf "      ${hcolor}%s${RESET}    ${COL_G1}> user    ${COL_DIM}│ ${RESET}%s\n" "$h1" "$USER"
-    # shellcheck disable=SC2059
-    printf "      ${hcolor}%s${RESET}    ${COL_G1}> uptime  ${COL_DIM}│ ${RESET}%s\n" "$h2" "$UPTIME"
-    # shellcheck disable=SC2059
-    printf "      ${hcolor}%s${RESET}    ${COL_G1}> display ${COL_DIM}│ ${RESET}%s\n" "$h3" "$RES"
-    # shellcheck disable=SC2059
-    printf "      ${hcolor}%s${RESET}    ${COL_G2}> distro  ${COL_DIM}│ ${RESET}%s\n" "$h4" "$OS"
-    # shellcheck disable=SC2059
-    printf "      ${hcolor}%s${RESET}    ${COL_G2}> kernel  ${COL_DIM}│ ${RESET}%s\n" "$h5" "$KERNEL"
-    # shellcheck disable=SC2059
-    printf "      ${hcolor}%s${RESET}    ${COL_G2}> wm      ${COL_DIM}│ ${RESET}%s\n" "$h6" "$WM"
-    # shellcheck disable=SC2059
-    printf "      ${hcolor}%s${RESET}    ${COL_G3}> desktop ${COL_DIM}│ ${RESET}%s\n" "$h7" "$DE"
-    # shellcheck disable=SC2059
-    printf "      ${hcolor}%s${RESET}    ${COL_G3}> term    ${COL_DIM}│ ${RESET}%s\n" "$h8" "$TERM_N"
-    # shellcheck disable=SC2059
-    printf "      ${hcolor}  PULSE-ACTIVE  ${RESET}    ${COL_G3}> shell   ${COL_DIM}│ ${RESET}%s\n" "$SHELL_V"
-    # shellcheck disable=SC2059
-    printf "      ${COL_WHITE}   [$(date +'%H:%M:%S')]${RESET}       ${COL_G4}> apps    ${COL_DIM}│ ${RESET}%s\n" "$PKGS"
-    # shellcheck disable=SC2059
-    printf "      ${COL_DIM}----------------${RESET}    ${COL_G4}> disk    ${COL_DIM}│ ${RESET}%s%%\n" "$DISK_P"
-    # shellcheck disable=SC2059
-    printf "                        ${COL_G4}  > OS Age  ${COL_DIM}│ ${RESET}%s\n" "$OS_AGE"
+    printf "      %s%s%s    %s> user    %s│ %s%s\n" "$hcolor" "$h1" "$RESET" "$COL_G1" "$COL_DIM" "$RESET" "$USER"
+    printf "      %s%s%s    %s> uptime  %s│ %s%s\n" "$hcolor" "$h2" "$RESET" "$COL_G1" "$COL_DIM" "$RESET" "$UPTIME"
+    printf "      %s%s%s    %s> display %s│ %s%s\n" "$hcolor" "$h3" "$RESET" "$COL_G1" "$COL_DIM" "$RESET" "$RES"
+    printf "      %s%s%s    %s> distro  %s│ %s%s\n" "$hcolor" "$h4" "$RESET" "$COL_G2" "$COL_DIM" "$RESET" "$OS"
+    printf "      %s%s%s    %s> kernel  %s│ %s%s\n" "$hcolor" "$h5" "$RESET" "$COL_G2" "$COL_DIM" "$RESET" "$KERNEL"
+    printf "      %s%s%s    %s> wm      %s│ %s%s\n" "$hcolor" "$h6" "$RESET" "$COL_G2" "$COL_DIM" "$RESET" "$WM"
+    printf "      %s%s%s    %s> desktop %s│ %s%s\n" "$hcolor" "$h7" "$RESET" "$COL_G3" "$COL_DIM" "$RESET" "$DE"
+    printf "      %s%s%s    %s> term    %s│ %s%s\n" "$hcolor" "$h8" "$RESET" "$COL_G3" "$COL_DIM" "$RESET" "$TERM_N"
+    printf "      %s  PULSE-ACTIVE  %s    %s> shell   %s│ %s%s\n" "$hcolor" "$RESET" "$COL_G3" "$COL_DIM" "$RESET" "$SHELL_V"
+    printf "      %s   [%s]%s       %s> apps    %s│ %s%s\n" "$COL_WHITE" "$now_hms" "$RESET" "$COL_G4" "$COL_DIM" "$RESET" "$PKGS"
+    printf "      %s----------------%s    %s> disk    %s│ %s%s%%\n" "$COL_DIM" "$RESET" "$COL_G4" "$COL_DIM" "$RESET" "$DISK_P"
+    printf "                        %s  > OS Age  %s│ %s%s\n" "$COL_G4" "$COL_DIM" "$RESET" "$OS_AGE"
 
-    # shellcheck disable=SC2059
-    printf "\n    ${COL_G1}CPU ${RESET} %3d%% %s  ${COL_DIM}%s${RESET}\n" "$CPU" "$(draw_bar "$CPU")" "$CPU_FREQ_DISP"
-    # shellcheck disable=SC2059
-    printf "    ${COL_G2}RAM ${RESET} %3d%% %s  ${COL_DIM}%s${RESET}\n" "$RAM_P" "$(draw_bar "$RAM_P")" "$RAM_STR"
-    # shellcheck disable=SC2059
-    printf "    ${COL_G3}DSK ${RESET} %3d%% %s  ${COL_DIM}%s/%s${RESET}\n" "$DISK_P" "$(draw_bar "$DISK_P")" "$DISK_USED" "$DISK_TOTAL"
+    printf "\n    %sCPU %s %3d%% %s  %s%s%s\n" "$COL_G1" "$RESET" "$CPU" "$(draw_bar "$CPU")" "$COL_DIM" "$CPU_FREQ_DISP" "$RESET"
+    printf "    %sRAM %s %3d%% %s  %s%s%s\n" "$COL_G2" "$RESET" "$RAM_P" "$(draw_bar "$RAM_P")" "$COL_DIM" "$RAM_STR" "$RESET"
+    printf "    %sDSK %s %3d%% %s  %s%s/%s%s\n" "$COL_G3" "$RESET" "$DISK_P" "$(draw_bar "$DISK_P")" "$COL_DIM" "$DISK_USED" "$DISK_TOTAL" "$RESET"
 
-    # shellcheck disable=SC2059
-    printf "\n    ${COL_G4}History: ${RESET}%s\n" "$(draw_graph)"
-    # shellcheck disable=SC2059
-    printf "    ${COL_G1}Net:     ${RESET}D:%skb U:%skb\n" "$DL" "$UL"
-    # shellcheck disable=SC2059
-    printf "    ${COL_G2}CPU:     ${RESET}%s @ %s\n" "$CPU_M" "$CPU_TEMP_DISP"
-    # shellcheck disable=SC2059
-    printf "    ${COL_G3}GPU:     ${RESET}%s @ %s\n" "$GPU_M" "$GPU_TEMP_DISP"
-    # shellcheck disable=SC2059
-    printf "    ${COL_G4}Battery: ${RESET}%s\n" "$BATTERY_INFO"
+    printf "\n    %sHistory: %s%s\n" "$COL_G4" "$RESET" "$(draw_graph)"
+    printf "    %sNet:     %sD:%skb U:%skb\n" "$COL_G1" "$RESET" "$DL" "$UL"
+    printf "    %sCPU:     %s%s @ %s\n" "$COL_G2" "$RESET" "$CPU_M" "$CPU_TEMP_DISP"
+    printf "    %sGPU:     %s%s @ %s\n" "$COL_G3" "$RESET" "$GPU_M" "$GPU_TEMP_DISP"
+    printf "    %sBattery: %s%s\n" "$COL_G4" "$RESET" "$BATTERY_INFO"
 
-    # shellcheck disable=SC2059
-    printf "\n  ${COL_DIM}Created by Carlos Corral | Pulse Active v${SCRIPT_VERSION}${RESET}\n"
-    # shellcheck disable=SC2059
-    printf "  ${COL_DIM}Repository: ${COL_G1}https://gitlab.com/corral1976/pulse${RESET}\n"
-    # shellcheck disable=SC2059
-    printf "  ${COL_DIM}Support: ${COL_G1}https://ko-fi.com/retrolcdclock${RESET}\n"
+    printf "\n  %sCreated by Carlos Corral | Pulse Active v%s%s\n" "$COL_DIM" "$SCRIPT_VERSION" "$RESET"
+    printf "  %sRepository: %shttps://gitlab.com/corral1976/pulse%s\n" "$COL_DIM" "$COL_G1" "$RESET"
+    printf "  %sSupport: %shttps://ko-fi.com/retrolcdclock%s\n" "$COL_DIM" "$COL_G1" "$RESET"
 }
 
 play_intro
@@ -847,7 +796,7 @@ while true; do
     S=$(( (L * 60 + O * 40) / 100 ))
     CPU_HISTORY=("${CPU_HISTORY[@]:1}" "$S")
 
-        if [ -r /proc/meminfo ]; then
+    if [ -r /proc/meminfo ]; then
         TOTAL_K=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
         AVAIL_K=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
         used_k=$((TOTAL_K - AVAIL_K))
@@ -871,7 +820,6 @@ while true; do
     if [ "$QUIET_MODE" = true ]; then
         printf "\r\e[K[%s] CPU:%3d%%  RAM:%3d%%  DSK:%3d%%  NET D:%dKB/U:%dKB  CPU:%s" \
             "$(date +'%H:%M:%S')" "$CPU" "$RAM_P" "$DISK_P" "$DL" "$UL" "$(format_temp "$CPU_TEMP")"
-        ((TICK++))
         read -r -t "$REFRESH_INTERVAL" -n 1 _ && break
         continue
     fi
@@ -883,19 +831,17 @@ if [ "$TERM_TYPE" = "gui" ]; then
     # frame fijo y se respeta el intervalo de refresco tal cual.
     if [ "$COLOR_MODE" = "none" ]; then
         draw_dashboard_gui full ""
-        ((TICK++))
         read -r -t "$REFRESH_INTERVAL" -n 1 _ && break
         continue
     fi
 
     draw_dashboard_gui full "$HEART_BRIGHT"
-    read -r -t 0.10 -n 1 _ && { ((TICK++)); break; }
+    read -r -t 0.10 -n 1 _ && break
     draw_dashboard_gui light "$HEART_DIM"
-    read -r -t 0.12 -n 1 _ && { ((TICK++)); break; }
+    read -r -t 0.12 -n 1 _ && break
     draw_dashboard_gui full "$HEART_BRIGHT"
-    read -r -t 0.10 -n 1 _ && { ((TICK++)); break; }
+    read -r -t 0.10 -n 1 _ && break
     draw_dashboard_gui light "$HEART_DIM"
-    ((TICK++))
     REST=$(awk -v r="$REFRESH_INTERVAL" 'BEGIN{v=r-0.32; if (v<0.1) v=0.1; printf "%.2f", v}')
     read -r -t "$REST" -n 1 _ && break
     continue
@@ -947,7 +893,6 @@ else
     printf "GitLab: https://gitlab.com/corral1976/pulse\n"
     printf "Support: https://ko-fi.com/retrolcdclock\n"
 
-    ((TICK++))
     read -r -t "$REFRESH_INTERVAL" -n 1 _ && break
 fi
 done
