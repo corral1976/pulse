@@ -685,7 +685,7 @@ play_intro() {
         ttylines+=("$(printf "╚════════════════════════════════════════════════════════════════╝")")
         ttylines+=("")
         ttylines+=("$(printf "       .MMM.   .MMM.  ")")
-        ttylines+=("$(printf "     .MMMMMM.MMMMMMM. ")")
+        ttylines+=("$(printf "      .MMMMMM.MMMMMM. ")")
         ttylines+=("$(printf "      MMMMMMMMMMMMMMM ")")
         ttylines+=("$(printf "      MMMMMMMMMMMMMMM ")")
         ttylines+=("$(printf "      'MMMMMMMMMMMMM' ")")
@@ -854,7 +854,7 @@ else
     printf "╚════════════════════════════════════════════════════════════════╝\n\n"
     
     printf "       .MMM.   .MMM.  \n"
-    printf "     .MMMMMM.MMMMMMM. \n"
+    printf "      .MMMMMM.MMMMMM. \n"
     printf "      MMMMMMMMMMMMMMM \n"
     printf "      MMMMMMMMMMMMMMM \n"
     printf "      'MMMMMMMMMMMMM' \n"
