@@ -1,6 +1,6 @@
 # Pulse-Active v1.0.0
 
-[![build](https://img.shields.io/github/actions/workflow/status/corral1976/pulse/blank.yml?style=flat-square&label=build&labelColor=282828&color=b8bb26)](https://github.com/corral1976/pulse/actions)
+[![build](https://img.shields.io/github/actions/workflow/status/corral1976/pulse/ci.yml?style=flat-square&label=build&labelColor=282828&color=b8bb26)](https://github.com/corral1976/pulse/actions)
 [![Latest Release](https://img.shields.io/github/v/release/corral1976/pulse)](https://github.com/corral1976/pulse/releases)
 [![stars](https://img.shields.io/github/stars/corral1976/pulse?style=flat-square&label=stars&labelColor=282828&color=d79921)](https://github.com/corral1976/pulse)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
